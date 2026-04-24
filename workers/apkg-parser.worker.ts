@@ -1,4 +1,5 @@
 import JSZip from "jszip"
+import { decompress } from "fzstd"
 import initSqlJs from "sql.js/dist/sql-wasm.js"
 
 import type {
@@ -13,6 +14,9 @@ import type {
 
 type QueryValue = number | string | Uint8Array | null
 type NoteRow = [number, string, number, string, string]
+type NormalizedFieldRow = [number, number, string]
+type NormalizedTemplateRow = [number, number, string, Uint8Array]
+type NormalizedNoteTypeRow = [number, string]
 type NotetypeJson = {
   name?: string
   flds?: Array<{ name?: string }>
@@ -30,7 +34,7 @@ let sqlInitPromise: ReturnType<typeof initSqlJs> | null = null
 function getSql() {
   if (!sqlInitPromise) {
     sqlInitPromise = initSqlJs({
-      locateFile: () => "/sql-wasm.wasm",
+      locateFile: () => new URL("/sql-wasm.wasm", self.location.origin).href,
     })
   }
 
@@ -39,6 +43,24 @@ function getSql() {
 
 function getFirstValue(values: QueryValue[][] | undefined) {
   return values?.[0]?.[0]
+}
+
+function isZstdFrame(bytes: Uint8Array) {
+  return (
+    bytes.length >= 4 &&
+    bytes[0] === 0x28 &&
+    bytes[1] === 0xb5 &&
+    bytes[2] === 0x2f &&
+    bytes[3] === 0xfd
+  )
+}
+
+async function decompressIfNeeded(bytes: Uint8Array) {
+  if (!isZstdFrame(bytes)) {
+    return bytes
+  }
+
+  return decompress(bytes)
 }
 
 function parseNoteFields(rawFields: string) {
@@ -62,6 +84,118 @@ function parseNoteTypes(rawModelsJson: string): ParsedNoteType[] {
       templates: parseTemplates(noteType.tmpls ?? []),
     }))
     .sort((left, right) => left.name.localeCompare(right.name))
+}
+
+function readVarint(bytes: Uint8Array, offset: number) {
+  let result = 0
+  let shift = 0
+  let cursor = offset
+
+  while (cursor < bytes.length) {
+    const byte = bytes[cursor]
+    result |= (byte & 0x7f) << shift
+    cursor += 1
+
+    if ((byte & 0x80) === 0) {
+      return { value: result, offset: cursor }
+    }
+
+    shift += 7
+  }
+
+  return null
+}
+
+function parseTemplateConfig(config: Uint8Array) {
+  const decoder = new TextDecoder()
+  const values: Record<number, string> = {}
+  let offset = 0
+
+  while (offset < config.length) {
+    const tag = readVarint(config, offset)
+
+    if (!tag) break
+    offset = tag.offset
+
+    const fieldNumber = tag.value >> 3
+    const wireType = tag.value & 0x07
+
+    if (wireType !== 2) {
+      break
+    }
+
+    const length = readVarint(config, offset)
+
+    if (!length) break
+    offset = length.offset
+
+    const end = offset + length.value
+
+    if (end > config.length) break
+    values[fieldNumber] = decoder.decode(config.slice(offset, end))
+    offset = end
+  }
+
+  return {
+    front: values[1] ?? "",
+    back: values[2] ?? "",
+  }
+}
+
+function parseNormalizedNoteTypes(database: initSqlJs.Database): ParsedNoteType[] {
+  const noteTypeRows = database.exec("select id, name from notetypes order by id")
+  const fieldRows = database.exec("select ntid, ord, name from fields order by ntid, ord")
+  const templateRows = database.exec(
+    "select ntid, ord, name, config from templates order by ntid, ord"
+  )
+  const fieldsByNoteType = new Map<string, string[]>()
+  const templatesByNoteType = new Map<string, ParsedCardTemplate[]>()
+
+  for (const [noteTypeId, , name] of
+    (fieldRows[0]?.values ?? []) as NormalizedFieldRow[]) {
+    const key = String(noteTypeId)
+    const fields = fieldsByNoteType.get(key) ?? []
+    fields.push(name)
+    fieldsByNoteType.set(key, fields)
+  }
+
+  for (const [noteTypeId, , name, config] of
+    (templateRows[0]?.values ?? []) as NormalizedTemplateRow[]) {
+    const key = String(noteTypeId)
+    const templates = templatesByNoteType.get(key) ?? []
+    const { front, back } = parseTemplateConfig(config)
+
+    templates.push({
+      name,
+      front,
+      back,
+    })
+    templatesByNoteType.set(key, templates)
+  }
+
+  return ((noteTypeRows[0]?.values ?? []) as NormalizedNoteTypeRow[]).map(
+    ([id, name]) => {
+      const key = String(id)
+
+      return {
+        id: key,
+        name,
+        fieldNames: fieldsByNoteType.get(key) ?? [],
+        templates: templatesByNoteType.get(key) ?? [],
+      }
+    }
+  )
+}
+
+function parseDatabaseNoteTypes(database: initSqlJs.Database) {
+  const collectionRow = database.exec("select models from col limit 1")
+  const rawModelsJson = String(getFirstValue(collectionRow[0]?.values) ?? "{}")
+
+  if (rawModelsJson.trim().length > 2) {
+    return parseNoteTypes(rawModelsJson)
+  }
+
+  return parseNormalizedNoteTypes(database)
 }
 
 function parseTemplates(templates: NonNullable<NotetypeJson["tmpls"]>): ParsedCardTemplate[] {
@@ -100,7 +234,7 @@ function findSupportedCollectionFile(entryNames: string[]) {
 }
 
 function parseMediaItems(rawMediaJson: string | undefined): ParsedMediaItem[] {
-  if (!rawMediaJson) {
+  if (!rawMediaJson?.trim()) {
     return []
   }
 
@@ -118,13 +252,16 @@ async function parseDeck(request: ApkgParserRequest): Promise<ParsedDeckSummary>
   const zip = await JSZip.loadAsync(request.buffer)
   const entryNames = Object.keys(zip.files)
   const collectionFileName = findSupportedCollectionFile(entryNames)
-  const collectionBytes = await zip.file(collectionFileName)?.async("uint8array")
+  const rawCollectionBytes = await zip.file(collectionFileName)?.async("uint8array")
 
-  if (!collectionBytes) {
+  if (!rawCollectionBytes) {
     throw new Error("Unable to read collection.anki21b from the archive.")
   }
 
-  const mediaJson = await zip.file("media")?.async("string")
+  const collectionBytes = await decompressIfNeeded(rawCollectionBytes)
+  const rawMediaBytes = await zip.file("media")?.async("uint8array")
+  const mediaBytes = rawMediaBytes ? await decompressIfNeeded(rawMediaBytes) : undefined
+  const mediaJson = mediaBytes ? new TextDecoder().decode(mediaBytes) : undefined
   const mediaItems = parseMediaItems(mediaJson)
   const SQL = await getSql()
   const database = new SQL.Database(collectionBytes)
@@ -139,12 +276,10 @@ async function parseDeck(request: ApkgParserRequest): Promise<ParsedDeckSummary>
     )
     const noteCountRow = database.exec("select count(*) as count from notes")
     const cardCountRow = database.exec("select count(*) as count from cards")
-    const collectionRow = database.exec("select models from col limit 1")
 
     const sqliteVersion = String(getFirstValue(versionRow[0]?.values) ?? "unknown")
     const tableNames = (tablesRow[0]?.values ?? []).map((value) => String(value[0]))
-    const rawModelsJson = String(getFirstValue(collectionRow[0]?.values) ?? "{}")
-    const noteTypes = parseNoteTypes(rawModelsJson)
+    const noteTypes = parseDatabaseNoteTypes(database)
     const sampleNotes: ParsedNote[] = ((noteRows[0]?.values ?? []) as NoteRow[]).map(
       ([id, guid, noteTypeId, rawFields, rawTags]) => ({
         id: String(id),

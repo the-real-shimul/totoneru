@@ -6,9 +6,9 @@
 
 ## Current Status
 
-**Phase:** 1 — Deck Parsing  
-**Next session target:** S2.3 — Split-pane original-vs-transformed preview  
-**Last updated:** 2026-04-24
+**Phase:** 3 — Schema Mapping & Templates  
+**Next session target:** S3.3 — Template definitions  
+**Last updated:** 2026-04-25
 
 ---
 
@@ -35,8 +35,8 @@
 | Pre-0 | Setup & decisions | ✅ Done | Spec written, decisions locked, repo created |
 | 0 | Foundation | ✅ Done | S0.1–S0.4 complete |
 | 1 | Deck Parsing | ✅ Done | S1.1–S1.5 complete |
-| 2 | Preview & Rendering | 🔄 In progress | S2.1 and S2.2 complete; S2.3 next |
-| 3 | Schema Mapping & Templates | ⬜ Not started | — |
+| 2 | Preview & Rendering | ✅ Done | S2.1–S2.4 complete |
+| 3 | Schema Mapping & Templates | 🟨 In progress | S3.1–S3.2 complete; S3.3 is next |
 | 4 | Built-In Transformations | ⬜ Not started | — |
 | 5 | AI Integration | ⬜ Not started | — |
 | 6 | Dry-Run & Transactional Batches | ⬜ Not started | — |
@@ -72,8 +72,17 @@
 |---|---|---|---|
 | S2.1 | Card browser | ✅ Done | Import result now includes up to 50 sample notes and a selectable browser with previous/next controls |
 | S2.2 | Card renderer | ✅ Done | Selected sample note renders front/back card faces in sandboxed iframes using basic Anki field interpolation |
-| S2.3 | Split-pane preview | ⬜ Next | — |
-| S2.4 | Diff highlighting | ⬜ Queued | — |
+| S2.3 | Split-pane preview | ✅ Done | Selected card now shows original and transformed preview panes side by side |
+| S2.4 | Diff highlighting | ✅ Done | Preview includes a field-level before/after diff summary for the current preview transform |
+
+## Phase 3 — Schema Mapping & Templates (current)
+
+| Session | Goal | Status | Notes |
+|---|---|---|---|
+| S3.1 | Heuristic field role detection | ✅ Done | Added role detection by field name + sample content and surfaced confidence indicators in the import result |
+| S3.2 | Mapping UI | ✅ Done | Suggested field roles are now editable per field |
+| S3.3 | Template definitions | ⬜ Not started | Define Vocabulary and Sentence template types |
+| S3.4 | Apply mappings | ⬜ Not started | Wire mappings into the internal representation |
 
 ### S1.1 implementation notes
 
@@ -99,6 +108,31 @@
 - **Card browser:** `components/apkg-import-probe.tsx` now lets users select from parsed sample notes and move through them with previous/next controls.
 - **Renderer:** `lib/anki-template-renderer.ts` added for initial Anki template interpolation; selected card front/back render in sandboxed iframes.
 - **Scope note:** current rendering is intentionally basic field interpolation. Full Anki template parity and original/transformed split preview are next-phase work.
+
+### S2.3-S2.4 implementation notes
+
+- **Split preview:** selected sample cards now render original and transformed preview panes side by side.
+- **Preview transform:** transformed preview currently applies a non-destructive field normalization pass to copied note data.
+- **Diff summary:** changed fields are shown with before/after values so users can see exactly what the preview transform changed.
+
+### S2 compatibility notes
+
+- **Modern `.apkg` support:** parser now handles Zstandard-compressed `collection.anki21b` / `media` entries using pure-JS `fzstd`.
+- **Normalized Anki schema:** parser supports newer `notetypes`, `fields`, and `templates` tables when `col.models` is empty.
+- **Worker WASM paths:** SQLite WASM is resolved from the worker origin to avoid invalid relative URLs.
+- **Real deck validation:** `Nihongo So-matome N2.apkg` parses locally with 56 notes, 56 cards, and the `Japanese So-Matome` note type.
+
+### S3.1 implementation notes
+
+- **Role detector:** `lib/schema-mapping.ts` added with heuristic field role detection for expression, reading, meaning, sentence, sentence reading, translation, and audio.
+- **Content heuristics:** suggestions combine field-name matches with sample content checks for Japanese, kana-heavy text, Latin text, text length, and Anki sound markers.
+- **Confidence UI:** import results now show suggested mappings and high/medium/low confidence badges per field.
+
+### S3.2 implementation notes
+
+- **Editable mapping:** suggested field roles can now be changed per field from the import result UI.
+- **Mapping state:** field role selections are stored in React state keyed by note type and field name.
+- **Scope note:** drag-and-drop ordering is still deferred; S3.2 currently covers editable role assignment and confidence display.
 
 ### S0.4 implementation notes
 
@@ -211,6 +245,16 @@
 - Verified `typecheck` and `eslint` pass; browser render is clean
 
 **Next session goal:** S2.3 — split-pane original-vs-transformed preview
+
+### 2026-04-25 — S2.3 + S2.4
+
+**Done:**
+- Added original-vs-transformed preview panes for the selected sample card
+- Added a non-destructive preview transform that normalizes copied field values
+- Added field-level before/after diff summary
+- Verified `eslint` passes and browser render is clean
+
+**Next session goal:** S3.3 — template definitions
 
 ---
 

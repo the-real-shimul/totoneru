@@ -17,6 +17,18 @@ import type {
   ParsedNote,
   ParsedNoteType,
 } from "@/lib/apkg-parser-types"
+import {
+  detectFieldRoles,
+  getFieldRoleLabel,
+  type FieldRole,
+  type FieldRoleSuggestion,
+} from "@/lib/schema-mapping"
+
+type FieldDiff = {
+  name: string
+  before: string
+  after: string
+}
 
 type BackupSummary = {
   id: string
@@ -25,10 +37,23 @@ type BackupSummary = {
   createdAt: string
 }
 
+type FieldMappingState = Record<string, Record<string, FieldRole>>
+
 type ProbeState =
   | { status: "idle" }
   | { status: "success"; deck: ParsedDeckSummary; backup: BackupSummary }
   | { status: "error"; message: string }
+
+const fieldRoleOptions: FieldRole[] = [
+  "expression",
+  "reading",
+  "meaning",
+  "sentence",
+  "sentenceReading",
+  "translation",
+  "audio",
+  "unknown",
+]
 
 function parseApkgInWorker(file: File, buffer: ArrayBuffer) {
   return new Promise<ParsedDeckSummary>((resolve, reject) => {
@@ -184,7 +209,20 @@ function DeckResults({
   backup: BackupSummary
 }) {
   const [selectedNoteIndex, setSelectedNoteIndex] = useState(0)
+  const [fieldMappings, setFieldMappings] = useState<FieldMappingState>(() =>
+    createInitialFieldMappings(deck)
+  )
   const selectedNote = deck.sampleNotes[selectedNoteIndex] ?? null
+
+  function updateFieldRole(noteTypeId: string, fieldName: string, role: FieldRole) {
+    setFieldMappings((current) => ({
+      ...current,
+      [noteTypeId]: {
+        ...current[noteTypeId],
+        [fieldName]: role,
+      },
+    }))
+  }
 
   return (
     <div className="space-y-5">
@@ -232,6 +270,26 @@ function DeckResults({
                 />
               </div>
             </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      {/* Mapping suggestions */}
+      <SectionCard label="Mapping" heading="Suggested field roles">
+        <div className="space-y-3">
+          {deck.noteTypes.map((noteType) => (
+            <MappingSuggestionCard
+              key={noteType.id}
+              noteType={noteType}
+              suggestions={detectFieldRoles({
+                noteType,
+                notes: deck.sampleNotes,
+              })}
+              selectedRoles={fieldMappings[noteType.id] ?? {}}
+              onRoleChange={(fieldName, role) =>
+                updateFieldRole(noteType.id, fieldName, role)
+              }
+            />
           ))}
         </div>
       </SectionCard>
@@ -343,6 +401,20 @@ function DeckResults({
 
 /* ---------- sub-components ---------- */
 
+function createInitialFieldMappings(deck: ParsedDeckSummary): FieldMappingState {
+  return Object.fromEntries(
+    deck.noteTypes.map((noteType) => [
+      noteType.id,
+      Object.fromEntries(
+        detectFieldRoles({ noteType, notes: deck.sampleNotes }).map((suggestion) => [
+          suggestion.fieldName,
+          suggestion.role,
+        ])
+      ),
+    ])
+  )
+}
+
 function SectionCard({
   label,
   heading,
@@ -402,6 +474,97 @@ function FieldChipRow({ label, values }: { label: string; values: string[] }) {
         ))}
       </div>
     </div>
+  )
+}
+
+function MappingSuggestionCard({
+  noteType,
+  suggestions,
+  selectedRoles,
+  onRoleChange,
+}: {
+  noteType: ParsedNoteType
+  suggestions: FieldRoleSuggestion[]
+  selectedRoles: Record<string, FieldRole>
+  onRoleChange: (fieldName: string, role: FieldRole) => void
+}) {
+  return (
+    <div className="rounded-[12px] border border-border bg-background/60 p-5">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[16px] font-medium text-foreground">{noteType.name}</p>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
+            Heuristic only. Editable mapping comes next.
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full border border-border bg-muted px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+          {suggestions.length} fields
+        </span>
+      </div>
+      <div className="grid gap-2 md:grid-cols-2">
+        {suggestions.map((suggestion) => (
+          <FieldRoleRow
+            key={suggestion.fieldName}
+            suggestion={suggestion}
+            selectedRole={selectedRoles[suggestion.fieldName] ?? suggestion.role}
+            onRoleChange={(role) => onRoleChange(suggestion.fieldName, role)}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function FieldRoleRow({
+  suggestion,
+  selectedRole,
+  onRoleChange,
+}: {
+  suggestion: FieldRoleSuggestion
+  selectedRole: FieldRole
+  onRoleChange: (role: FieldRole) => void
+}) {
+  return (
+    <div className="rounded-[8px] border border-border bg-card px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="min-w-0 truncate font-mono text-[12px] text-foreground">
+          {suggestion.fieldName}
+        </p>
+        <ConfidenceBadge confidence={suggestion.confidence} />
+      </div>
+      <label className="mt-2 block">
+        <span className="sr-only">Role for {suggestion.fieldName}</span>
+        <select
+          value={selectedRole}
+          onChange={(event) => onRoleChange(event.target.value as FieldRole)}
+          className="w-full rounded-[8px] border border-border bg-background px-3 py-2 text-[14px] font-medium text-foreground outline-none transition-colors focus:border-foreground/40"
+        >
+          {fieldRoleOptions.map((role) => (
+            <option key={role} value={role}>
+              {getFieldRoleLabel(role)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="mt-1 line-clamp-2 text-[12px] text-muted-foreground">
+        Suggested: {getFieldRoleLabel(suggestion.role)} ·{" "}
+        {suggestion.reasons.join("; ")}
+      </p>
+    </div>
+  )
+}
+
+function ConfidenceBadge({ confidence }: { confidence: number }) {
+  const percent = Math.round(confidence * 100)
+  const label = confidence >= 0.75 ? "high" : confidence >= 0.5 ? "medium" : "low"
+
+  return (
+    <span
+      className="rounded-[6px] border border-border bg-muted px-2 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground"
+      title={`${percent}% confidence`}
+    >
+      {label} · {percent}%
+    </span>
   )
 }
 
@@ -467,9 +630,21 @@ function CardPreviewSection({
 
   const frontHtml = renderAnkiTemplate({ template: template.front, note, noteType })
   const backHtml = renderAnkiTemplate({ template: template.back, note, noteType })
+  const transformedNote = createPreviewTransformedNote(note)
+  const transformedFrontHtml = renderAnkiTemplate({
+    template: template.front,
+    note: transformedNote,
+    noteType,
+  })
+  const transformedBackHtml = renderAnkiTemplate({
+    template: template.back,
+    note: transformedNote,
+    noteType,
+  })
+  const fieldDiffs = getFieldDiffs({ note, transformedNote, noteType })
 
   return (
-    <SectionCard label="Render" heading="Card preview">
+    <SectionCard label="Preview" heading="Original vs transformed">
       <div className="mb-4 flex items-center gap-2">
         <span className="font-mono text-[12px] text-muted-foreground">{noteType.name}</span>
         <span className="text-muted-foreground">·</span>
@@ -478,11 +653,147 @@ function CardPreviewSection({
           sandboxed iframe
         </span>
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <PreviewFrame title="Front" html={createPreviewDocument({ title: "Front", body: frontHtml })} />
-        <PreviewFrame title="Back" html={createPreviewDocument({ title: "Back", body: backHtml })} />
+      <div className="grid gap-4 xl:grid-cols-2">
+        <PreviewPane
+          title="Original"
+          frontHtml={frontHtml}
+          backHtml={backHtml}
+          changed={false}
+        />
+        <PreviewPane
+          title="Transformed preview"
+          frontHtml={transformedFrontHtml}
+          backHtml={transformedBackHtml}
+          changed={fieldDiffs.length > 0}
+        />
       </div>
+      <FieldDiffPanel diffs={fieldDiffs} />
     </SectionCard>
+  )
+}
+
+function createPreviewTransformedNote(note: ParsedNote): ParsedNote {
+  return {
+    ...note,
+    fieldValues: note.fieldValues.map((value) => normalizePreviewField(value)),
+  }
+}
+
+function normalizePreviewField(value: string) {
+  return value
+    .replace(/\r\n?/g, "\n")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+}
+
+function getFieldDiffs({
+  note,
+  transformedNote,
+  noteType,
+}: {
+  note: ParsedNote
+  transformedNote: ParsedNote
+  noteType: ParsedNoteType
+}): FieldDiff[] {
+  return note.fieldValues
+    .map((before, index) => ({
+      name: noteType.fieldNames[index] ?? `Field ${index + 1}`,
+      before,
+      after: transformedNote.fieldValues[index] ?? "",
+    }))
+    .filter((diff) => diff.before !== diff.after)
+}
+
+function PreviewPane({
+  title,
+  frontHtml,
+  backHtml,
+  changed,
+}: {
+  title: string
+  frontHtml: string
+  backHtml: string
+  changed: boolean
+}) {
+  return (
+    <div className="rounded-[12px] border border-border bg-background/60 p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="text-[15px] font-medium text-foreground">{title}</p>
+        <span
+          className="rounded-[6px] border border-border bg-muted px-2 py-0.5 font-mono text-[11px] text-muted-foreground"
+          data-changed={changed}
+        >
+          {changed ? "changed" : "unchanged"}
+        </span>
+      </div>
+      <div className="grid gap-3">
+        <PreviewFrame
+          title="Front"
+          html={createPreviewDocument({ title: `${title} front`, body: frontHtml })}
+        />
+        <PreviewFrame
+          title="Back"
+          html={createPreviewDocument({ title: `${title} back`, body: backHtml })}
+        />
+      </div>
+    </div>
+  )
+}
+
+function FieldDiffPanel({ diffs }: { diffs: FieldDiff[] }) {
+  return (
+    <div className="mt-4 rounded-[12px] border border-border bg-background/60 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[15px] font-medium text-foreground">Diff summary</p>
+        <span className="rounded-[6px] border border-border bg-muted px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+          {diffs.length} fields
+        </span>
+      </div>
+      {diffs.length === 0 ? (
+        <p className="mt-3 text-[14px] text-muted-foreground">
+          No field changes in the current preview transform.
+        </p>
+      ) : (
+        <div className="mt-3 space-y-3">
+          {diffs.map((diff) => (
+            <div key={diff.name} className="rounded-[8px] border border-border bg-card p-3">
+              <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                {diff.name}
+              </p>
+              <div className="mt-2 grid gap-2 md:grid-cols-2">
+                <DiffValue label="Before" value={diff.before} tone="before" />
+                <DiffValue label="After" value={diff.after} tone="after" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DiffValue({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: string
+  tone: "before" | "after"
+}) {
+  return (
+    <div
+      className="rounded-[6px] border px-3 py-2"
+      data-tone={tone}
+    >
+      <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-[13px] text-foreground">
+        {value || "(empty)"}
+      </p>
+    </div>
   )
 }
 
