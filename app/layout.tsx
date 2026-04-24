@@ -2,6 +2,7 @@ import { Geist, Geist_Mono, Space_Grotesk, JetBrains_Mono } from "next/font/goog
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
+import { AnalyticsProvider } from "@/components/analytics-provider"
 import { cn } from "@/lib/utils";
 
 const jetbrainsMonoHeading = JetBrains_Mono({subsets:['latin'],variable:'--font-heading'});
@@ -25,7 +26,9 @@ export default function RootLayout({
       className={cn("antialiased", fontMono.variable, "font-sans", spaceGrotesk.variable, jetbrainsMonoHeading.variable)}
     >
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <AnalyticsProvider>{children}</AnalyticsProvider>
+        </ThemeProvider>
       </body>
     </html>
   )
