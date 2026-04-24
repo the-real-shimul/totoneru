@@ -75,11 +75,6 @@ export async function saveActiveDeck(deck: ActiveDeck): Promise<void> {
   await database.put(DECK_STORE, deck)
 }
 
-export async function loadActiveDeck(deckId: string): Promise<ActiveDeck | undefined> {
-  const database = await getDatabase()
-  return database.get(DECK_STORE, deckId)
-}
-
 export async function loadMostRecentActiveDeck(): Promise<ActiveDeck | undefined> {
   const database = await getDatabase()
   const allDecks = await database.getAll(DECK_STORE)
@@ -93,17 +88,4 @@ export async function loadMostRecentActiveDeck(): Promise<ActiveDeck | undefined
 export async function deleteActiveDeck(deckId: string): Promise<void> {
   const database = await getDatabase()
   await database.delete(DECK_STORE, deckId)
-}
-
-export async function listActiveDecks(): Promise<
-  Pick<ActiveDeck, "id" | "fileName" | "fileSize" | "importedAt">[]
-> {
-  const database = await getDatabase()
-  const allDecks = await database.getAll(DECK_STORE)
-  return allDecks.map((deck) => ({
-    id: deck.id,
-    fileName: deck.fileName,
-    fileSize: deck.fileSize,
-    importedAt: deck.importedAt,
-  }))
 }

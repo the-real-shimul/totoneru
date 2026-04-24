@@ -1,7 +1,24 @@
 import { withSentryConfig } from "@sentry/nextjs"
+import { fileURLToPath } from "node:url"
+
+const emptyNodeModule = fileURLToPath(
+  new URL("./lib/empty-node-module.ts", import.meta.url)
+)
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  webpack(config, { isServer, webpack }) {
+    if (!isServer) {
+      config.plugins.push(
+        new webpack.NormalModuleReplacementPlugin(
+          /^node:(crypto|fs)$/,
+          emptyNodeModule
+        )
+      )
+    }
+
+    return config
+  },
   async rewrites() {
     return [
       {

@@ -9,16 +9,6 @@ export async function saveBatchResult(result: BatchResult): Promise<void> {
   await database.put(BATCH_STORE, result)
 }
 
-export async function loadBatchResult(deckId: string): Promise<BatchResult | undefined> {
-  const database = await getDatabase()
-  return database.get(BATCH_STORE, deckId)
-}
-
-export async function deleteBatchResult(deckId: string): Promise<void> {
-  const database = await getDatabase()
-  await database.delete(BATCH_STORE, deckId)
-}
-
 export type StagedChanges = {
   deckId: string
   cardResults: CardResult[]
@@ -39,9 +29,4 @@ export async function loadStagedChanges(deckId: string): Promise<StagedChanges |
 export async function deleteStagedChanges(deckId: string): Promise<void> {
   const database = await getDatabase()
   await database.delete(STAGED_STORE, deckId)
-}
-
-export async function hasStagedChanges(deckId: string): Promise<boolean> {
-  const changes = await loadStagedChanges(deckId)
-  return changes !== undefined
 }

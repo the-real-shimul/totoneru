@@ -4,6 +4,7 @@ import initSqlJs from "sql.js/dist/sql-wasm.js"
 
 import { computeCsum } from "@/lib/anki-checksum"
 import type { ActiveDeck } from "@/lib/deck-model"
+import { applyTemplateTransform } from "@/lib/templates"
 import { applyTransformations } from "@/lib/transformations"
 import type { TransformationConfig } from "@/lib/transformations"
 import type { BatchResult } from "@/lib/batch-operations"
@@ -87,11 +88,16 @@ export async function buildTransformedApkg(
       const noteTypes = config.activeDeck.deck.noteTypes
       const noteTypeById = new Map(noteTypes.map((nt) => [nt.id, nt]))
 
-      const batchChangesByNoteId = new Map<string, string[]>()
+      const batchChangesByNoteId = new Map<
+        string,
+        { transformedFields: string[] }
+      >()
       if (config.batchResult) {
         for (const card of config.batchResult.cardResults) {
           if (card.status === "success" && card.changed) {
-            batchChangesByNoteId.set(card.noteId, card.transformedFields)
+            batchChangesByNoteId.set(card.noteId, {
+              transformedFields: card.transformedFields,
+            })
           }
         }
       }
@@ -125,45 +131,29 @@ export async function buildTransformedApkg(
         const fieldMappings = mapping?.fieldMappings ?? {}
 
         const originalFields = splitFields(rawFlds)
-        let fields = [...originalFields]
-        let anyChanged = false
-
-        // Apply template reordering
-        if (mapping?.templateSelection && mapping.templateSelection !== "none") {
-          const reordered: string[] = []
-          const used = new Set<number>()
-
-          for (const role of getTemplateOrder(mapping.templateSelection)) {
-            const fieldName = Object.entries(fieldMappings).find(
-              ([, r]) => r === role
-            )?.[0]
-            if (fieldName) {
-              const idx = noteType.fieldNames.indexOf(fieldName)
-              if (idx >= 0 && !used.has(idx)) {
-                reordered.push(fields[idx])
-                used.add(idx)
-              }
-            }
-          }
-
-          for (let i = 0; i < fields.length; i++) {
-            if (!used.has(i)) {
-              reordered.push(fields[i])
-              used.add(i)
-            }
-          }
-
-          if (reordered.length === fields.length) {
-            fields = reordered
-            anyChanged = true
-          }
-        }
+        const templateTransform = applyTemplateTransform({
+          note: {
+            id: String(id),
+            guid: "",
+            noteTypeId: String(mid),
+            fieldValues: originalFields,
+            tags: [],
+          },
+          noteType,
+          fieldMappings,
+          templateType: mapping?.templateSelection ?? "none",
+        })
+        const fields = [...templateTransform.note.fieldValues]
+        const fieldOrder = templateTransform.fieldOrder
+        let anyChanged = fields.some((value, index) => value !== originalFields[index])
 
         // Apply built-in transformations
         for (let i = 0; i < noteType.fieldNames.length; i++) {
           const fieldName = noteType.fieldNames[i]
           const role = fieldMappings[fieldName] ?? "unknown"
           const originalValue = originalFields[i] ?? ""
+          const transformedIndex = fieldOrder.indexOf(fieldName)
+          if (transformedIndex < 0) continue
 
           const result = await applyTransformations({
             value: originalValue,
@@ -172,17 +162,17 @@ export async function buildTransformedApkg(
           })
 
           if (result.changed) {
-            fields[i] = result.value
+            fields[transformedIndex] = result.value
             anyChanged = true
           }
         }
 
         // Apply batch/AI changes if present
-        const batchFields = batchChangesByNoteId.get(String(id))
-        if (batchFields) {
-          for (let i = 0; i < Math.min(fields.length, batchFields.length); i++) {
-            if (fields[i] !== batchFields[i]) {
-              fields[i] = batchFields[i]
+        const batchChange = batchChangesByNoteId.get(String(id))
+        if (batchChange) {
+          for (let i = 0; i < Math.min(fields.length, batchChange.transformedFields.length); i++) {
+            if (fields[i] !== batchChange.transformedFields[i]) {
+              fields[i] = batchChange.transformedFields[i]
               anyChanged = true
             }
           }
@@ -246,31 +236,5 @@ export async function buildTransformedApkg(
       errorMessage: error instanceof Error ? error.message : String(error),
       verified: false,
     }
-  }
-}
-
-function getTemplateOrder(templateType: string): string[] {
-  switch (templateType) {
-    case "vocabulary":
-      return [
-        "expression",
-        "reading",
-        "meaning",
-        "sentence",
-        "sentenceReading",
-        "translation",
-        "audio",
-      ]
-    case "sentence":
-      return [
-        "sentence",
-        "sentenceReading",
-        "translation",
-        "expression",
-        "meaning",
-        "audio",
-      ]
-    default:
-      return []
   }
 }

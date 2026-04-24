@@ -90,7 +90,7 @@ async function applyAiPromptToNote({
   noteType: ParsedNoteType
   fieldMappings: Record<string, FieldRole>
   prompt: UserPrompt
-}): Promise<Record<number, string>> {
+}): Promise<Record<string, string>> {
   const key = await getActiveApiKey()
   if (!key) {
     throw new Error("No API key configured")
@@ -140,7 +140,7 @@ async function applyAiPromptToNote({
   )
 
   if (outputFieldIndex >= 0) {
-    return { [outputFieldIndex]: sanitized }
+    return { [noteType.fieldNames[outputFieldIndex]]: sanitized }
   }
 
   return {}
@@ -193,11 +193,10 @@ export async function processCard({
         fieldMappings,
         prompt,
       })
-      for (const [index, value] of Object.entries(aiChanges)) {
-        const idx = Number(index)
-        const fieldName = templateTransform.fieldOrder[idx]
-        if (fieldName) {
-          transformedFields[idx] = value
+      for (const [fieldName, value] of Object.entries(aiChanges)) {
+        const transformedIndex = templateTransform.fieldOrder.indexOf(fieldName)
+        if (transformedIndex >= 0) {
+          transformedFields[transformedIndex] = value
         }
       }
     }

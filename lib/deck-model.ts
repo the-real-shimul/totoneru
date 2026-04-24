@@ -103,19 +103,3 @@ export function updateTemplateSelection(
     }),
   }
 }
-
-export function getFieldMappingsForNoteType(
-  activeDeck: ActiveDeck,
-  noteTypeId: string
-): Record<string, FieldRole> {
-  const mapping = getNoteTypeMapping(activeDeck, noteTypeId)
-  return mapping?.fieldMappings ?? {}
-}
-
-export function getTemplateSelectionForNoteType(
-  activeDeck: ActiveDeck,
-  noteTypeId: string
-): TemplateType {
-  const mapping = getNoteTypeMapping(activeDeck, noteTypeId)
-  return mapping?.templateSelection ?? "none"
-}
