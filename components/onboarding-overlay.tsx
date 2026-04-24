@@ -1,29 +1,34 @@
 "use client"
 
-import { useEffect, useId, useRef, useState } from "react"
+import { useEffect, useId, useRef } from "react"
 import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
+import {
+  createBrowserStore,
+  useBrowserStore,
+} from "@/lib/browser-store"
 
 const ONBOARDING_KEY = "totoneru_onboarding_dismissed"
 
-function hasBeenDismissed(): boolean {
-  if (typeof window === "undefined") return true
-  return localStorage.getItem(ONBOARDING_KEY) === "true"
-}
+const dismissedStore = createBrowserStore<boolean>({
+  key: ONBOARDING_KEY,
+  parse: (raw) => raw === "true",
+  serialize: (value) => (value ? "true" : "false"),
+  defaultValue: true,
+})
 
 export function OnboardingOverlay() {
-  const [visible, setVisible] = useState(() => !hasBeenDismissed())
+  const dismissed = useBrowserStore(dismissedStore)
   const dialogRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
 
   function dismiss() {
-    localStorage.setItem(ONBOARDING_KEY, "true")
-    setVisible(false)
+    dismissedStore.set(true)
   }
 
   useEffect(() => {
-    if (!visible) return
+    if (dismissed) return
 
     const dialog = dialogRef.current
     if (!dialog) return
@@ -82,9 +87,9 @@ export function OnboardingOverlay() {
       document.removeEventListener("keydown", onKeyDown)
       previouslyFocused?.focus()
     }
-  }, [visible])
+  }, [dismissed])
 
-  if (!visible) return null
+  if (dismissed) return null
 
   return (
     <div

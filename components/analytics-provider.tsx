@@ -7,9 +7,13 @@ import {
   useContext,
   useEffect,
   useRef,
-  useState,
   type ReactNode,
 } from "react"
+
+import {
+  createBrowserStore,
+  useBrowserStore,
+} from "@/lib/browser-store"
 
 const STORAGE_KEY = "totoneru_analytics_consent"
 type AnalyticsProperties = Record<string, string | number | boolean | null>
@@ -24,40 +28,19 @@ const AnalyticsContext = createContext<AnalyticsContextValue>({
   capture: () => {},
 })
 
-function useAnalyticsConsent() {
-  const [consented, setConsented] = useState<boolean | null>(() => {
-    if (typeof window === "undefined") {
-      return null
-    }
-
-    const stored = window.localStorage.getItem(STORAGE_KEY)
-
-    if (stored === "true") {
-      return true
-    }
-
-    if (stored === "false") {
-      return false
-    }
-
+const consentStore = createBrowserStore<boolean | null>({
+  key: STORAGE_KEY,
+  parse: (raw) => {
+    if (raw === "true") return true
+    if (raw === "false") return false
     return null
-  })
-
-  const accept = () => {
-    localStorage.setItem(STORAGE_KEY, "true")
-    setConsented(true)
-  }
-
-  const decline = () => {
-    localStorage.setItem(STORAGE_KEY, "false")
-    setConsented(false)
-  }
-
-  return { consented, accept, decline }
-}
+  },
+  serialize: (value) => (value === true ? "true" : value === false ? "false" : ""),
+  defaultValue: null,
+})
 
 export function AnalyticsProvider({ children }: { children: ReactNode }) {
-  const { consented, accept, decline } = useAnalyticsConsent()
+  const consented = useBrowserStore(consentStore)
   const prevConsented = useRef(consented)
 
   const analytics = {
@@ -97,7 +80,10 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
       <PostHogProvider client={posthog}>
         {children}
         {consented === null && (
-          <ConsentBanner onAccept={accept} onDecline={decline} />
+          <ConsentBanner
+            onAccept={() => consentStore.set(true)}
+            onDecline={() => consentStore.set(false)}
+          />
         )}
       </PostHogProvider>
     </AnalyticsContext.Provider>

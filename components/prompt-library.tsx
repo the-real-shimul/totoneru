@@ -5,15 +5,17 @@ import { useId, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import type { ActiveDeck } from "@/lib/deck-model"
+import {
+  createBrowserStore,
+  useBrowserStore,
+} from "@/lib/browser-store"
 import { CURATED_PROMPTS, estimateCost, estimateTokens, interpolatePrompt, type UserPrompt } from "@/lib/prompts"
 import { getFieldRoleLabel } from "@/lib/schema-mapping"
 import type { FieldRole } from "@/lib/schema-mapping"
 
 const STORAGE_KEY = "totoneru_user_prompts"
 
-function loadUserPrompts(): UserPrompt[] {
-  if (typeof window === "undefined") return []
-  const raw = localStorage.getItem(STORAGE_KEY)
+function parsePrompts(raw: string | null): UserPrompt[] {
   if (!raw) return []
   try {
     return JSON.parse(raw) as UserPrompt[]
@@ -22,9 +24,12 @@ function loadUserPrompts(): UserPrompt[] {
   }
 }
 
-function saveUserPrompts(prompts: UserPrompt[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(prompts))
-}
+const userPromptsStore = createBrowserStore<UserPrompt[]>({
+  key: STORAGE_KEY,
+  parse: parsePrompts,
+  serialize: JSON.stringify,
+  defaultValue: [],
+})
 
 export function PromptLibrary({
   activeDeck,
@@ -35,14 +40,12 @@ export function PromptLibrary({
   onSelectPrompt: (prompt: UserPrompt | null) => void
   selectedPromptId: string | null
 }) {
-  const [userPrompts, setUserPrompts] = useState<UserPrompt[]>(() => loadUserPrompts())
-
+  const userPrompts = useBrowserStore(userPromptsStore)
   const allPrompts = [...CURATED_PROMPTS, ...userPrompts]
 
   function handleDelete(promptId: string) {
     const updated = userPrompts.filter((p) => p.id !== promptId)
-    setUserPrompts(updated)
-    saveUserPrompts(updated)
+    userPromptsStore.set(updated)
     if (selectedPromptId === promptId) {
       onSelectPrompt(null)
     }
@@ -241,8 +244,8 @@ export function PromptEditor({
       createdAt: new Date().toISOString(),
     }
 
-    const existing = loadUserPrompts()
-    saveUserPrompts([...existing, prompt])
+    const existing = userPromptsStore.get()
+    userPromptsStore.set([...existing, prompt])
     onSave(prompt)
 
     setIsSaving(false)

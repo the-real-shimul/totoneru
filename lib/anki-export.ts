@@ -1,3 +1,4 @@
+import { decompress } from "fzstd"
 import JSZip from "jszip"
 import initSqlJs from "sql.js/dist/sql-wasm.js"
 
@@ -23,6 +24,24 @@ export type ExportResult = {
   unchangedNoteCount: number
   errorMessage: string
   verified: boolean
+}
+
+function isZstdFrame(bytes: Uint8Array) {
+  return (
+    bytes.length >= 4 &&
+    bytes[0] === 0x28 &&
+    bytes[1] === 0xb5 &&
+    bytes[2] === 0x2f &&
+    bytes[3] === 0xfd
+  )
+}
+
+async function decompressIfNeeded(bytes: Uint8Array) {
+  if (!isZstdFrame(bytes)) {
+    return bytes
+  }
+
+  return decompress(bytes)
 }
 
 async function getSql() {
@@ -59,7 +78,8 @@ export async function buildTransformedApkg(
       }
     }
 
-    const collectionBytes = await collectionEntry.async("uint8array")
+    const rawCollectionBytes = await collectionEntry.async("uint8array")
+    const collectionBytes = await decompressIfNeeded(rawCollectionBytes)
     const SQL = await getSql()
     const db = new SQL.Database(collectionBytes)
 
