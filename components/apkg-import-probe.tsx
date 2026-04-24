@@ -1,7 +1,7 @@
 "use client"
 
 import { ChevronLeft, ChevronRight, LoaderCircle, Play, Upload, X } from "lucide-react"
-import { useId, useRef, useState, useTransition, useEffect } from "react"
+import { useCallback, useId, useMemo, useRef, useState, useTransition, useEffect } from "react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -80,6 +80,8 @@ const fieldRoleOptions: FieldRole[] = [
   "audio",
   "unknown",
 ]
+
+const EMPTY_FIELD_MAPPINGS: Record<string, FieldRole> = {}
 
 function parseApkgInWorker(file: File, buffer: ArrayBuffer) {
   return new Promise<ParsedDeckSummary>((resolve, reject) => {
@@ -282,15 +284,33 @@ function DeckResults({
   const summary = deck.deck
   const selectedNote = summary.sampleNotes[selectedNoteIndex] ?? null
 
-  const noteTypeMappings = new Map(deck.noteTypeMappings.map((m) => [m.noteTypeId, m]))
+  const noteTypeMappings = useMemo(
+    () => new Map(deck.noteTypeMappings.map((m) => [m.noteTypeId, m])),
+    [deck.noteTypeMappings]
+  )
 
-  function getFieldMappings(noteTypeId: string): Record<string, FieldRole> {
-    return noteTypeMappings.get(noteTypeId)?.fieldMappings ?? {}
-  }
+  const getFieldMappings = useCallback(
+    (noteTypeId: string): Record<string, FieldRole> =>
+      noteTypeMappings.get(noteTypeId)?.fieldMappings ?? EMPTY_FIELD_MAPPINGS,
+    [noteTypeMappings]
+  )
 
-  function getTemplateSelection(noteTypeId: string): TemplateType {
-    return noteTypeMappings.get(noteTypeId)?.templateSelection ?? "none"
-  }
+  const getTemplateSelection = useCallback(
+    (noteTypeId: string): TemplateType =>
+      noteTypeMappings.get(noteTypeId)?.templateSelection ?? "none",
+    [noteTypeMappings]
+  )
+
+  const handleBatchResultChange = useCallback((result: BatchResult | null) => {
+    setBatchResult(result)
+  }, [])
+
+  const handleBlockLayoutChange = useCallback((noteTypeId: string, layout: LayoutConfig) => {
+    setBlockLayouts((prev) => ({
+      ...prev,
+      [noteTypeId]: layout,
+    }))
+  }, [])
 
   async function handleUpdateFieldRole(noteTypeId: string, fieldName: string, role: FieldRole) {
     const updated = updateFieldMapping(deck, noteTypeId, fieldName, role)
@@ -527,7 +547,7 @@ function DeckResults({
               selectedPrompt={selectedPrompt}
               getFieldMappings={getFieldMappings}
               getTemplateSelection={getTemplateSelection}
-              onBatchResultChange={setBatchResult}
+              onBatchResultChange={handleBatchResultChange}
             />
           </SectionCard>
 
@@ -558,10 +578,7 @@ function DeckResults({
             transformationConfigs={transformationConfigs}
             blockLayout={blockLayouts[selectedNote.noteTypeId]}
             onBlockLayoutChange={(layout) =>
-              setBlockLayouts((prev) => ({
-                ...prev,
-                [selectedNote.noteTypeId]: layout,
-              }))
+              handleBlockLayoutChange(selectedNote.noteTypeId, layout)
             }
           />
         </>
