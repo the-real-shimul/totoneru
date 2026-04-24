@@ -2,17 +2,46 @@
 
 import posthog from "posthog-js"
 import { PostHogProvider } from "posthog-js/react"
-import { useEffect, useState } from "react"
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react"
 
 const STORAGE_KEY = "totoneru_analytics_consent"
+type AnalyticsProperties = Record<string, string | number | boolean | null>
+
+type AnalyticsContextValue = {
+  consented: boolean
+  capture: (event: string, properties?: AnalyticsProperties) => void
+}
+
+const AnalyticsContext = createContext<AnalyticsContextValue>({
+  consented: false,
+  capture: () => {},
+})
 
 function useAnalyticsConsent() {
-  const [consented, setConsented] = useState<boolean | null>(null)
+  const [consented, setConsented] = useState<boolean | null>(() => {
+    if (typeof window === "undefined") {
+      return null
+    }
 
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    setConsented(stored === "true")
-  }, [])
+    const stored = window.localStorage.getItem(STORAGE_KEY)
+
+    if (stored === "true") {
+      return true
+    }
+
+    if (stored === "false") {
+      return false
+    }
+
+    return null
+  })
 
   const accept = () => {
     localStorage.setItem(STORAGE_KEY, "true")
@@ -27,8 +56,20 @@ function useAnalyticsConsent() {
   return { consented, accept, decline }
 }
 
-export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
+export function AnalyticsProvider({ children }: { children: ReactNode }) {
   const { consented, accept, decline } = useAnalyticsConsent()
+  const prevConsented = useRef(consented)
+
+  const analytics = {
+    consented: consented === true,
+    capture: (event: string, properties?: AnalyticsProperties) => {
+      if (consented !== true) {
+        return
+      }
+
+      posthog.capture(event, properties)
+    },
+  }
 
   useEffect(() => {
     if (
@@ -37,21 +78,34 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
       process.env.NODE_ENV === "production"
     ) {
       posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
-        api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://app.posthog.com",
+        api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "/ingest",
+        ui_host: "https://us.posthog.com",
+        defaults: "2026-01-30",
         capture_pageview: true,
+        capture_exceptions: true,
         persistence: "localStorage",
       })
+      if (prevConsented.current === null) {
+        posthog.capture("analytics_consent_accepted")
+      }
     }
+    prevConsented.current = consented
   }, [consented])
 
   return (
-    <PostHogProvider client={posthog}>
-      {children}
-      {consented === null && (
-        <ConsentBanner onAccept={accept} onDecline={decline} />
-      )}
-    </PostHogProvider>
+    <AnalyticsContext.Provider value={analytics}>
+      <PostHogProvider client={posthog}>
+        {children}
+        {consented === null && (
+          <ConsentBanner onAccept={accept} onDecline={decline} />
+        )}
+      </PostHogProvider>
+    </AnalyticsContext.Provider>
   )
+}
+
+export function useAnalytics() {
+  return useContext(AnalyticsContext)
 }
 
 function ConsentBanner({

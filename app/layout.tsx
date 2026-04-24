@@ -1,17 +1,29 @@
-import { Geist, Geist_Mono, Space_Grotesk, JetBrains_Mono } from "next/font/google"
+import localFont from "next/font/local"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AnalyticsProvider } from "@/components/analytics-provider"
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 
-const jetbrainsMonoHeading = JetBrains_Mono({subsets:['latin'],variable:'--font-heading'});
+const jetbrainsMonoHeading = localFont({
+  src: "./fonts/JetBrainsMono-Variable.ttf",
+  variable: "--font-app-heading",
+  weight: "100 800",
+  display: "swap",
+})
 
-const spaceGrotesk = Space_Grotesk({subsets:['latin'],variable:'--font-sans'})
+const spaceGrotesk = localFont({
+  src: "./fonts/SpaceGrotesk-Variable.ttf",
+  variable: "--font-app-sans",
+  weight: "300 700",
+  display: "swap",
+})
 
-const fontMono = Geist_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
+const fontMono = localFont({
+  src: "./fonts/GeistMono-Latin.woff2",
+  variable: "--font-app-mono",
+  weight: "100 900",
+  display: "swap",
 })
 
 export default function RootLayout({
@@ -23,9 +35,14 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", spaceGrotesk.variable, jetbrainsMonoHeading.variable)}
+      className={cn(
+        "font-sans antialiased",
+        fontMono.variable,
+        spaceGrotesk.variable,
+        jetbrainsMonoHeading.variable
+      )}
     >
-      <body>
+      <body className="min-h-svh bg-background text-foreground">
         <ThemeProvider>
           <AnalyticsProvider>{children}</AnalyticsProvider>
         </ThemeProvider>
