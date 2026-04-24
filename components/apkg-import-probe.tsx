@@ -1,7 +1,7 @@
 "use client"
 
-import { ChevronLeft, ChevronRight, LoaderCircle, Upload } from "lucide-react"
-import { useId, useRef, useState, useTransition } from "react"
+import { ChevronLeft, ChevronRight, LoaderCircle, Play, Upload, X } from "lucide-react"
+import { useId, useRef, useState, useTransition, useEffect } from "react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -9,7 +9,7 @@ import {
   getFirstRenderableTemplate,
   renderAnkiTemplate,
 } from "@/lib/anki-template-renderer"
-import { saveOriginalDeckBackup } from "@/lib/deck-backups"
+import { saveOriginalDeckBackup, saveActiveDeck, loadMostRecentActiveDeck, deleteActiveDeck } from "@/lib/deck-storage"
 import type {
   ApkgParserRequest,
   ApkgParserResponse,
@@ -23,25 +23,51 @@ import {
   type FieldRole,
   type FieldRoleSuggestion,
 } from "@/lib/schema-mapping"
+import {
+  applyTemplateTransform,
+  computeTemplateDiffs,
+  getBestTemplateMatch,
+  getTemplatePreviewStyles,
+  renderTemplatePreviewHtml,
+  TEMPLATE_OPTIONS,
+  TEMPLATES,
+  type TemplateType,
+} from "@/lib/templates"
+import {
+  createActiveDeck,
+  updateFieldMapping,
+  updateTemplateSelection,
+  type ActiveDeck,
+} from "@/lib/deck-model"
+import {
+  applyTransformations,
+  DEFAULT_TRANSFORMATIONS,
+  type TransformationConfig,
+  type TransformationType,
+} from "@/lib/transformations"
+import type { BatchResult } from "@/lib/batch-operations"
+import { AiSettings } from "@/components/ai-settings"
+import { BatchRunner } from "@/components/batch-runner"
+import { BlockEditor, generatePreviewWithBlocks } from "@/components/block-editor"
+import { ExportPanel } from "@/components/export-panel"
+import { PromptEditor, PromptLibrary } from "@/components/prompt-library"
+import type { UserPrompt } from "@/lib/prompts"
+import { estimateCost, estimateTokens, interpolatePrompt, sanitizeAiOutput } from "@/lib/prompts"
+import { sendAiRequest } from "@/lib/ai-client"
+import { getActiveApiKey } from "@/lib/ai-keys"
+import type { AiMessage } from "@/lib/ai-types"
+import type { LayoutConfig } from "@/lib/block-editor"
 
 type FieldDiff = {
   name: string
   before: string
   after: string
+  moved?: boolean
 }
-
-type BackupSummary = {
-  id: string
-  fileName: string
-  fileSize: number
-  createdAt: string
-}
-
-type FieldMappingState = Record<string, Record<string, FieldRole>>
 
 type ProbeState =
   | { status: "idle" }
-  | { status: "success"; deck: ParsedDeckSummary; backup: BackupSummary }
+  | { status: "success"; activeDeck: ActiveDeck }
   | { status: "error"; message: string }
 
 const fieldRoleOptions: FieldRole[] = [
@@ -92,6 +118,26 @@ export function ApkgImportProbe() {
   const [result, setResult] = useState<ProbeState>({ status: "idle" })
   const [isPending, startTransition] = useTransition()
 
+  useEffect(() => {
+    let cancelled = false
+    loadMostRecentActiveDeck().then((activeDeck) => {
+      if (!cancelled && activeDeck) {
+        setResult({ status: "success", activeDeck })
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  function handleClearWorkspace() {
+    if (result.status === "success") {
+      deleteActiveDeck(result.activeDeck.id).then(() => {
+        setResult({ status: "idle" })
+      })
+    }
+  }
+
   function handleFileChange(file: File | null) {
     if (!file) return
 
@@ -101,7 +147,14 @@ export function ApkgImportProbe() {
         const parseBuffer = backupBuffer.slice(0)
         const backup = await saveOriginalDeckBackup(file, backupBuffer)
         const deck = await parseApkgInWorker(file, parseBuffer)
-        setResult({ status: "success", deck, backup })
+        const activeDeck = createActiveDeck({
+          deck,
+          backupId: backup.id,
+          fileName: backup.fileName,
+          fileSize: backup.fileSize,
+        })
+        await saveActiveDeck(activeDeck)
+        setResult({ status: "success", activeDeck })
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Failed to inspect the package."
@@ -173,55 +226,90 @@ export function ApkgImportProbe() {
         {result.status === "success" && (
           <div className="flex items-center justify-between gap-6">
             <div className="space-y-1">
-              <p className="text-[15px] font-medium text-foreground">{result.backup.fileName}</p>
+              <p className="text-[15px] font-medium text-foreground">{result.activeDeck.fileName}</p>
               <p className="font-mono text-[12px] text-muted-foreground">
-                Backed up · {Math.round(result.backup.fileSize / 1024)} KB ·{" "}
-                {new Date(result.backup.createdAt).toLocaleString()}
+                Active workspace · {Math.round(result.activeDeck.fileSize / 1024)} KB ·{" "}
+                {new Date(result.activeDeck.importedAt).toLocaleString()}
               </p>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => document.getElementById(inputId)?.click()}
-              disabled={isPending}
-            >
-              {isPending ? <LoaderCircle className="animate-spin" /> : <Upload />}
-              Replace
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleClearWorkspace}
+              >
+                <X />
+                Clear
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => document.getElementById(inputId)?.click()}
+                disabled={isPending}
+              >
+                {isPending ? <LoaderCircle className="animate-spin" /> : <Upload />}
+                Replace
+              </Button>
+            </div>
           </div>
         )}
       </div>
 
       {/* Results — only shown after successful import */}
       {result.status === "success" && (
-        <DeckResults deck={result.deck} backup={result.backup} />
+        <DeckResults activeDeck={result.activeDeck} />
       )}
     </div>
   )
 }
 
 function DeckResults({
-  deck,
-  backup,
+  activeDeck,
 }: {
-  deck: ParsedDeckSummary
-  backup: BackupSummary
+  activeDeck: ActiveDeck
 }) {
   const [selectedNoteIndex, setSelectedNoteIndex] = useState(0)
-  const [fieldMappings, setFieldMappings] = useState<FieldMappingState>(() =>
-    createInitialFieldMappings(deck)
+  const [deck, setDeck] = useState<ActiveDeck>(activeDeck)
+  const [transformationConfigs, setTransformationConfigs] = useState<TransformationConfig[]>(
+    () => DEFAULT_TRANSFORMATIONS.map((t) => ({ ...t }))
   )
-  const selectedNote = deck.sampleNotes[selectedNoteIndex] ?? null
+  const [selectedPrompt, setSelectedPrompt] = useState<UserPrompt | null>(null)
+  const [showPromptEditor, setShowPromptEditor] = useState(false)
+  const [blockLayouts, setBlockLayouts] = useState<Record<string, LayoutConfig>>({})
+  const [batchResult, setBatchResult] = useState<BatchResult | null>(null)
+  const summary = deck.deck
+  const selectedNote = summary.sampleNotes[selectedNoteIndex] ?? null
 
-  function updateFieldRole(noteTypeId: string, fieldName: string, role: FieldRole) {
-    setFieldMappings((current) => ({
-      ...current,
-      [noteTypeId]: {
-        ...current[noteTypeId],
-        [fieldName]: role,
-      },
-    }))
+  const noteTypeMappings = new Map(deck.noteTypeMappings.map((m) => [m.noteTypeId, m]))
+
+  function getFieldMappings(noteTypeId: string): Record<string, FieldRole> {
+    return noteTypeMappings.get(noteTypeId)?.fieldMappings ?? {}
+  }
+
+  function getTemplateSelection(noteTypeId: string): TemplateType {
+    return noteTypeMappings.get(noteTypeId)?.templateSelection ?? "none"
+  }
+
+  async function handleUpdateFieldRole(noteTypeId: string, fieldName: string, role: FieldRole) {
+    const updated = updateFieldMapping(deck, noteTypeId, fieldName, role)
+    setDeck(updated)
+    await saveActiveDeck(updated)
+  }
+
+  async function handleUpdateTemplateSelection(noteTypeId: string, templateType: TemplateType) {
+    const updated = updateTemplateSelection(deck, noteTypeId, templateType)
+    setDeck(updated)
+    await saveActiveDeck(updated)
+  }
+
+  function toggleTransformation(type: TransformationType) {
+    setTransformationConfigs((current) =>
+      current.map((config) =>
+        config.type === type ? { ...config, enabled: !config.enabled } : config
+      )
+    )
   }
 
   return (
@@ -230,23 +318,23 @@ function DeckResults({
       {/* Stats overview */}
       <SectionCard label="Overview" heading="Deck stats">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <BigStat label="Notes" value={String(deck.noteCount)} />
-          <BigStat label="Cards" value={String(deck.cardCount)} />
-          <BigStat label="Note types" value={String(deck.noteTypeCount)} />
-          <BigStat label="Media files" value={String(deck.mediaCount)} />
+          <BigStat label="Notes" value={String(summary.noteCount)} />
+          <BigStat label="Cards" value={String(summary.cardCount)} />
+          <BigStat label="Note types" value={String(summary.noteTypeCount)} />
+          <BigStat label="Media files" value={String(summary.mediaCount)} />
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <SmallStat label="Templates" value={String(deck.templateCount)} />
-          <SmallStat label="Named fields" value={String(deck.fieldCount)} />
-          <SmallStat label="SQLite" value={deck.sqliteVersion} />
-          <SmallStat label="Collection" value={deck.collectionFileName} />
+          <SmallStat label="Templates" value={String(summary.templateCount)} />
+          <SmallStat label="Named fields" value={String(summary.fieldCount)} />
+          <SmallStat label="SQLite" value={summary.sqliteVersion} />
+          <SmallStat label="Collection" value={summary.collectionFileName} />
         </div>
       </SectionCard>
 
       {/* Note types */}
       <SectionCard label="Schema" heading="Note types">
         <div className="space-y-3">
-          {deck.noteTypes.map((noteType) => (
+          {summary.noteTypes.map((noteType) => (
             <div
               key={noteType.id}
               className="rounded-[12px] border border-border bg-background/60 p-5"
@@ -277,20 +365,73 @@ function DeckResults({
       {/* Mapping suggestions */}
       <SectionCard label="Mapping" heading="Suggested field roles">
         <div className="space-y-3">
-          {deck.noteTypes.map((noteType) => (
+          {summary.noteTypes.map((noteType) => (
             <MappingSuggestionCard
               key={noteType.id}
               noteType={noteType}
               suggestions={detectFieldRoles({
                 noteType,
-                notes: deck.sampleNotes,
+                notes: summary.sampleNotes,
               })}
-              selectedRoles={fieldMappings[noteType.id] ?? {}}
+              selectedRoles={getFieldMappings(noteType.id)}
               onRoleChange={(fieldName, role) =>
-                updateFieldRole(noteType.id, fieldName, role)
+                handleUpdateFieldRole(noteType.id, fieldName, role)
               }
             />
           ))}
+        </div>
+      </SectionCard>
+
+      {/* Template selection */}
+      <SectionCard label="Template" heading="Choose a template">
+        <div className="space-y-3">
+          {summary.noteTypes.map((noteType) => (
+            <TemplateSelectionCard
+              key={noteType.id}
+              noteType={noteType}
+              fieldMappings={getFieldMappings(noteType.id)}
+              selectedTemplate={getTemplateSelection(noteType.id)}
+              onTemplateChange={(templateType) =>
+                handleUpdateTemplateSelection(noteType.id, templateType)
+              }
+            />
+          ))}
+        </div>
+      </SectionCard>
+
+      {/* AI settings */}
+      <SectionCard label="AI" heading="API keys">
+        <AiSettings />
+      </SectionCard>
+
+      {/* Prompt library */}
+      <SectionCard label="Prompts" heading="AI prompt library">
+        <div className="space-y-4">
+          <PromptLibrary
+            activeDeck={deck}
+            onSelectPrompt={setSelectedPrompt}
+            selectedPromptId={selectedPrompt?.id ?? null}
+          />
+          <div className="border-t border-border pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowPromptEditor((s) => !s)}
+            >
+              {showPromptEditor ? "Cancel" : "Create custom prompt"}
+            </Button>
+            {showPromptEditor && (
+              <div className="mt-3">
+                <PromptEditor
+                  onSave={(prompt) => {
+                    setSelectedPrompt(prompt)
+                    setShowPromptEditor(false)
+                  }}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </SectionCard>
 
@@ -312,16 +453,16 @@ function DeckResults({
               <ChevronLeft />
             </Button>
             <span className="min-w-12 text-center font-mono text-[12px] text-muted-foreground">
-              {selectedNoteIndex + 1}/{deck.sampleNotes.length}
+              {selectedNoteIndex + 1}/{summary.sampleNotes.length}
             </span>
             <Button
               type="button"
               variant="outline"
               size="icon-sm"
               aria-label="Next note"
-              disabled={selectedNoteIndex >= deck.sampleNotes.length - 1}
+              disabled={selectedNoteIndex >= summary.sampleNotes.length - 1}
               onClick={() =>
-                setSelectedNoteIndex(Math.min(deck.sampleNotes.length - 1, selectedNoteIndex + 1))
+                setSelectedNoteIndex(Math.min(summary.sampleNotes.length - 1, selectedNoteIndex + 1))
               }
             >
               <ChevronRight />
@@ -329,8 +470,8 @@ function DeckResults({
           </div>
         </div>
         <div className="max-h-[28rem] space-y-2 overflow-y-auto pr-1">
-          {deck.sampleNotes.map((note, index) => {
-            const noteType = deck.noteTypes.find((nt) => nt.id === note.noteTypeId)
+          {summary.sampleNotes.map((note, index) => {
+            const noteType = summary.noteTypes.find((nt) => nt.id === note.noteTypeId)
             const isSelected = index === selectedNoteIndex
             return (
               <NoteRow
@@ -347,17 +488,93 @@ function DeckResults({
 
       {/* Card preview */}
       {selectedNote && (
-        <CardPreviewSection note={selectedNote} noteTypes={deck.noteTypes} />
+        <>
+          <SectionCard label="Transform" heading="Built-in transformations">
+            <div className="space-y-2">
+              {transformationConfigs.map((config) => (
+                <label
+                  key={config.type}
+                  className="flex cursor-pointer items-center justify-between gap-3 rounded-[8px] border border-border bg-background/60 px-4 py-3"
+                >
+                  <div>
+                    <p className="text-[14px] font-medium text-foreground">
+                      {config.type === "furigana" && "Furigana generation"}
+                      {config.type === "htmlClean" && "HTML cleaner"}
+                      {config.type === "fieldNormalize" && "Field normalizer"}
+                    </p>
+                    <p className="text-[12px] text-muted-foreground">
+                      {config.type === "furigana" && "Add ruby annotations to kanji using kuromoji.js"}
+                      {config.type === "htmlClean" && "Strip font/span/style/class tags"}
+                      {config.type === "fieldNormalize" && "Normalize whitespace and line endings"}
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={config.enabled}
+                    onChange={() => toggleTransformation(config.type)}
+                    className="size-4 accent-foreground"
+                  />
+                </label>
+              ))}
+            </div>
+          </SectionCard>
+
+          {/* Batch operations */}
+          <SectionCard label="Batch" heading="Apply transformations">
+            <BatchRunner
+              activeDeck={deck}
+              transformationConfigs={transformationConfigs}
+              selectedPrompt={selectedPrompt}
+              getFieldMappings={getFieldMappings}
+              getTemplateSelection={getTemplateSelection}
+              onBatchResultChange={setBatchResult}
+            />
+          </SectionCard>
+
+          {/* Export */}
+          <SectionCard label="Export" heading="Finalize &amp; download">
+            <ExportPanel
+              activeDeck={deck}
+              transformationConfigs={transformationConfigs}
+              batchResult={batchResult}
+            />
+          </SectionCard>
+
+          {/* AI transformation */}
+          {selectedPrompt && (
+            <AiTransformSection
+              prompt={selectedPrompt}
+              note={selectedNote}
+              noteTypes={summary.noteTypes}
+              getFieldMappings={getFieldMappings}
+            />
+          )}
+
+          <CardPreviewSection
+            note={selectedNote}
+            noteTypes={summary.noteTypes}
+            getFieldMappings={getFieldMappings}
+            getTemplateSelection={getTemplateSelection}
+            transformationConfigs={transformationConfigs}
+            blockLayout={blockLayouts[selectedNote.noteTypeId]}
+            onBlockLayoutChange={(layout) =>
+              setBlockLayouts((prev) => ({
+                ...prev,
+                [selectedNote.noteTypeId]: layout,
+              }))
+            }
+          />
+        </>
       )}
 
       {/* Media + Schema */}
       <div className="grid gap-5 lg:grid-cols-2">
         <SectionCard label="Assets" heading="Media manifest">
-          {deck.mediaSamples.length === 0 ? (
+          {summary.mediaSamples.length === 0 ? (
             <p className="text-[15px] text-muted-foreground">No media entries found.</p>
           ) : (
             <div className="space-y-2">
-              {deck.mediaSamples.map((item) => (
+              {summary.mediaSamples.map((item) => (
                 <div
                   key={`${item.archiveName}-${item.fileName}`}
                   className="flex items-center justify-between gap-3 rounded-[8px] border border-border bg-background/60 px-4 py-2.5"
@@ -375,7 +592,7 @@ function DeckResults({
         <SectionCard label="Integrity" heading="Schema &amp; backup">
           <div className="space-y-3">
             <div className="flex flex-wrap gap-2">
-              {deck.tableNames.map((name) => (
+              {summary.tableNames.map((name) => (
                 <span
                   key={name}
                   className="rounded-[6px] border border-border bg-muted px-2 py-1 font-mono text-[12px] text-muted-foreground"
@@ -385,10 +602,10 @@ function DeckResults({
               ))}
             </div>
             <div className="grid grid-cols-2 gap-3 pt-1">
-              <SmallStat label="Zip entries" value={String(deck.zipEntryCount)} />
+              <SmallStat label="Zip entries" value={String(summary.zipEntryCount)} />
               <SmallStat
                 label="Backup size"
-                value={`${Math.round(backup.fileSize / 1024)} KB`}
+                value={`${Math.round(deck.fileSize / 1024)} KB`}
               />
             </div>
           </div>
@@ -400,20 +617,6 @@ function DeckResults({
 }
 
 /* ---------- sub-components ---------- */
-
-function createInitialFieldMappings(deck: ParsedDeckSummary): FieldMappingState {
-  return Object.fromEntries(
-    deck.noteTypes.map((noteType) => [
-      noteType.id,
-      Object.fromEntries(
-        detectFieldRoles({ noteType, notes: deck.sampleNotes }).map((suggestion) => [
-          suggestion.fieldName,
-          suggestion.role,
-        ])
-      ),
-    ])
-  )
-}
 
 function SectionCard({
   label,
@@ -582,6 +785,7 @@ function NoteRow({
   return (
     <button
       type="button"
+      aria-pressed={isSelected}
       className="w-full rounded-[12px] border border-border bg-background/60 p-5 text-left transition-colors hover:bg-muted/50 data-[selected=true]:border-foreground/20 data-[selected=true]:bg-muted"
       data-selected={isSelected}
       onClick={onClick}
@@ -608,12 +812,144 @@ function NoteRow({
   )
 }
 
+function AiTransformSection({
+  prompt,
+  note,
+  noteTypes,
+  getFieldMappings,
+}: {
+  prompt: UserPrompt
+  note: ParsedNote
+  noteTypes: ParsedNoteType[]
+  getFieldMappings: (noteTypeId: string) => Record<string, FieldRole>
+}) {
+  const [result, setResult] = useState("")
+  const [isRunning, setIsRunning] = useState(false)
+  const [error, setError] = useState("")
+
+  const noteType = noteTypes.find((nt) => nt.id === note.noteTypeId)
+  const fieldMappings = noteType ? getFieldMappings(noteType.id) : {}
+
+  const roleToFieldName: Record<string, string> = {}
+  for (const [fieldName, role] of Object.entries(fieldMappings)) {
+    roleToFieldName[role] = fieldName
+  }
+
+  const variableValues: Record<string, string> = {}
+  for (const variable of prompt.variables) {
+    const fieldName = roleToFieldName[variable.role]
+    if (fieldName && noteType) {
+      const index = noteType.fieldNames.indexOf(fieldName)
+      if (index >= 0) {
+        variableValues[variable.name] = note.fieldValues[index] ?? ""
+      }
+    }
+  }
+
+  const interpolatedSystem = interpolatePrompt(prompt.systemMessage, variableValues)
+  const interpolatedUser = interpolatePrompt(prompt.userMessage, variableValues)
+  const tokenEstimate = estimateTokens(interpolatedSystem + interpolatedUser)
+  const costEstimate = estimateCost(tokenEstimate, "gpt-4o-mini")
+
+  async function handleRun() {
+    setIsRunning(true)
+    setError("")
+    setResult("")
+
+    try {
+      const key = await getActiveApiKey()
+      if (!key) {
+        setError("No API key saved. Add one in the AI settings above.")
+        return
+      }
+
+      const messages: AiMessage[] = []
+      if (interpolatedSystem) {
+        messages.push({ role: "system", content: interpolatedSystem })
+      }
+      messages.push({ role: "user", content: interpolatedUser })
+
+      const response = await sendAiRequest({
+        provider: key.provider,
+        messages,
+        config: {
+          endpoint: key.endpoint,
+          apiKey: key.apiKey,
+          model: key.model,
+        },
+      })
+
+      setResult(sanitizeAiOutput(response))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "AI request failed")
+    } finally {
+      setIsRunning(false)
+    }
+  }
+
+  return (
+    <SectionCard label="AI" heading={`Run: ${prompt.name}`}>
+      <div className="space-y-3">
+        <div className="rounded-[8px] border border-border bg-background/60 px-4 py-3">
+          <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+            Interpolated prompt
+          </p>
+          <p className="mt-1 whitespace-pre-wrap text-[13px] text-foreground">
+            {interpolatedUser || "(no variables matched)"}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Button
+            type="button"
+            onClick={handleRun}
+            disabled={isRunning}
+          >
+            {isRunning ? <LoaderCircle className="animate-spin" /> : <Play />}
+            {isRunning ? "Running..." : "Run on sample"}
+          </Button>
+          <span className="font-mono text-[11px] text-muted-foreground">
+            ~{tokenEstimate} tokens · ~${costEstimate.toFixed(4)}
+          </span>
+        </div>
+
+        {error && (
+          <p className="rounded-[8px] bg-[rgba(217,58,38,0.10)] px-4 py-3 text-[13px] text-[#A8321A]">
+            {error}
+          </p>
+        )}
+
+        {result && (
+          <div className="rounded-[8px] border border-border bg-background/60 px-4 py-3">
+            <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+              Result
+            </p>
+            <p className="mt-1 whitespace-pre-wrap text-[13px] text-foreground">
+              {result}
+            </p>
+          </div>
+        )}
+      </div>
+    </SectionCard>
+  )
+}
+
 function CardPreviewSection({
   note,
   noteTypes,
+  getFieldMappings,
+  getTemplateSelection,
+  transformationConfigs,
+  blockLayout,
+  onBlockLayoutChange,
 }: {
   note: ParsedNote
   noteTypes: ParsedNoteType[]
+  getFieldMappings: (noteTypeId: string) => Record<string, FieldRole>
+  getTemplateSelection: (noteTypeId: string) => TemplateType
+  transformationConfigs: TransformationConfig[]
+  blockLayout?: LayoutConfig
+  onBlockLayoutChange?: (layout: LayoutConfig) => void
 }) {
   const noteType = noteTypes.find((c) => c.id === note.noteTypeId)
   const template = noteType ? getFirstRenderableTemplate(noteType) : null
@@ -628,27 +964,183 @@ function CardPreviewSection({
     )
   }
 
+  return (
+    <CardPreviewContent
+      note={note}
+      noteType={noteType}
+      template={template}
+      fieldMappings={getFieldMappings(note.noteTypeId)}
+      templateType={getTemplateSelection(note.noteTypeId)}
+      transformationConfigs={transformationConfigs}
+      blockLayout={blockLayout}
+      onBlockLayoutChange={onBlockLayoutChange}
+    />
+  )
+}
+
+function CardPreviewContent({
+  note,
+  noteType,
+  template,
+  fieldMappings,
+  templateType,
+  transformationConfigs,
+  blockLayout,
+  onBlockLayoutChange,
+}: {
+  note: ParsedNote
+  noteType: ParsedNoteType
+  template: { name: string; front: string; back: string }
+  fieldMappings: Record<string, FieldRole>
+  templateType: TemplateType
+  transformationConfigs: TransformationConfig[]
+  blockLayout?: LayoutConfig
+  onBlockLayoutChange?: (layout: LayoutConfig) => void
+}) {
+  const [preview, setPreview] = useState<{
+    transformedFrontHtml: string
+    transformedBackHtml: string
+    fieldDiffs: { name: string; before: string; after: string; moved?: boolean }[]
+    isLoading: boolean
+  }>({
+    transformedFrontHtml: "",
+    transformedBackHtml: "",
+    fieldDiffs: [],
+    isLoading: true,
+  })
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function computePreview() {
+      setPreview((p) => ({ ...p, isLoading: true }))
+
+      const transformed = applyTemplateTransform({
+        note,
+        noteType,
+        fieldMappings,
+        templateType,
+      })
+
+      const transformedNote = transformed.note
+
+      for (let i = 0; i < noteType.fieldNames.length; i++) {
+        const fieldName = noteType.fieldNames[i]
+        const role = fieldMappings[fieldName] ?? "unknown"
+        const originalValue = note.fieldValues[i] ?? ""
+        const transformedIndex = transformed.fieldOrder.indexOf(fieldName)
+        if (transformedIndex >= 0) {
+          const result = await applyTransformations({
+            value: originalValue,
+            role,
+            configs: transformationConfigs,
+          })
+          transformedNote.fieldValues[transformedIndex] = result.value
+        }
+      }
+
+      const fieldDiffs = computeTemplateDiffs({
+        originalNote: note,
+        transformedNote,
+        originalNoteType: noteType,
+        transformedFieldOrder: transformed.fieldOrder,
+      })
+
+      const transformedFrontHtml = blockLayout
+        ? generatePreviewWithBlocks({
+            note: transformedNote,
+            noteType,
+            fieldMappings,
+            layout: blockLayout,
+            face: "front",
+          }).html
+        : templateType === "none"
+          ? renderAnkiTemplate({
+              template: template.front,
+              note: transformedNote,
+              noteType,
+            })
+          : renderTemplatePreviewHtml({
+              note: transformedNote,
+              noteType,
+              fieldMappings,
+              templateType,
+              face: "front",
+            })
+
+      const transformedBackHtml = blockLayout
+        ? generatePreviewWithBlocks({
+            note: transformedNote,
+            noteType,
+            fieldMappings,
+            layout: blockLayout,
+            face: "back",
+          }).html
+        : templateType === "none"
+          ? renderAnkiTemplate({
+              template: template.back,
+              note: transformedNote,
+              noteType,
+            })
+          : renderTemplatePreviewHtml({
+              note: transformedNote,
+              noteType,
+              fieldMappings,
+              templateType,
+              face: "back",
+            })
+
+      if (!cancelled) {
+        setPreview({
+          transformedFrontHtml,
+          transformedBackHtml,
+          fieldDiffs,
+          isLoading: false,
+        })
+      }
+    }
+
+    computePreview()
+
+    return () => {
+      cancelled = true
+    }
+  }, [note, noteType, template, fieldMappings, templateType, transformationConfigs, blockLayout])
+
   const frontHtml = renderAnkiTemplate({ template: template.front, note, noteType })
   const backHtml = renderAnkiTemplate({ template: template.back, note, noteType })
-  const transformedNote = createPreviewTransformedNote(note)
-  const transformedFrontHtml = renderAnkiTemplate({
-    template: template.front,
-    note: transformedNote,
-    noteType,
-  })
-  const transformedBackHtml = renderAnkiTemplate({
-    template: template.back,
-    note: transformedNote,
-    noteType,
-  })
-  const fieldDiffs = getFieldDiffs({ note, transformedNote, noteType })
+  const blockStyles = blockLayout
+    ? generatePreviewWithBlocks({ note, noteType, fieldMappings, layout: blockLayout, face: "front" }).styles
+    : ""
+  const extraStyles = blockLayout
+    ? blockStyles
+    : templateType !== "none"
+      ? getTemplatePreviewStyles()
+      : ""
 
   return (
     <SectionCard label="Preview" heading="Original vs transformed">
+      {onBlockLayoutChange && (
+        <div className="mb-4">
+          <BlockEditor
+            availableRoles={Object.values(fieldMappings).filter((r): r is FieldRole => r !== "unknown")}
+            initialLayout={blockLayout}
+            onLayoutChange={onBlockLayoutChange}
+          />
+        </div>
+      )}
       <div className="mb-4 flex items-center gap-2">
         <span className="font-mono text-[12px] text-muted-foreground">{noteType.name}</span>
         <span className="text-muted-foreground">·</span>
         <span className="font-mono text-[12px] text-muted-foreground">{template.name}</span>
+        {templateType !== "none" && (
+          <>
+            <span className="text-muted-foreground">·</span>
+            <span className="rounded-[6px] border border-border bg-muted px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+              {templateType} template
+            </span>
+          </>
+        )}
         <span className="ml-auto rounded-[6px] border border-border bg-muted px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
           sandboxed iframe
         </span>
@@ -662,59 +1154,161 @@ function CardPreviewSection({
         />
         <PreviewPane
           title="Transformed preview"
-          frontHtml={transformedFrontHtml}
-          backHtml={transformedBackHtml}
-          changed={fieldDiffs.length > 0}
+          frontHtml={preview.transformedFrontHtml}
+          backHtml={preview.transformedBackHtml}
+          changed={preview.fieldDiffs.length > 0}
+          extraStyles={extraStyles}
+          isLoading={preview.isLoading}
         />
       </div>
-      <FieldDiffPanel diffs={fieldDiffs} />
+      <FieldDiffPanel diffs={preview.fieldDiffs} />
     </SectionCard>
   )
 }
 
-function createPreviewTransformedNote(note: ParsedNote): ParsedNote {
-  return {
-    ...note,
-    fieldValues: note.fieldValues.map((value) => normalizePreviewField(value)),
-  }
-}
+/* ---------- template selection components ---------- */
 
-function normalizePreviewField(value: string) {
-  return value
-    .replace(/\r\n?/g, "\n")
-    .replace(/[ \t]+/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim()
-}
-
-function getFieldDiffs({
-  note,
-  transformedNote,
+function TemplateSelectionCard({
   noteType,
+  fieldMappings,
+  selectedTemplate,
+  onTemplateChange,
 }: {
-  note: ParsedNote
-  transformedNote: ParsedNote
   noteType: ParsedNoteType
-}): FieldDiff[] {
-  return note.fieldValues
-    .map((before, index) => ({
-      name: noteType.fieldNames[index] ?? `Field ${index + 1}`,
-      before,
-      after: transformedNote.fieldValues[index] ?? "",
-    }))
-    .filter((diff) => diff.before !== diff.after)
+  fieldMappings: Record<string, FieldRole>
+  selectedTemplate: TemplateType
+  onTemplateChange: (templateType: TemplateType) => void
+}) {
+  const match = getBestTemplateMatch(fieldMappings)
+  const isSuggested = match?.template.id === selectedTemplate && match.score >= 0.5
+
+  return (
+    <div className="rounded-[12px] border border-border bg-background/60 p-5">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[16px] font-medium text-foreground">{noteType.name}</p>
+          {match && match.score >= 0.5 && (
+            <p className="mt-0.5 text-[13px] text-muted-foreground">
+              Suggested: {match.template.name} ({Math.round(match.score * 100)}% match)
+            </p>
+          )}
+        </div>
+        <span className="shrink-0 rounded-full border border-border bg-muted px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+          {noteType.fieldNames.length} fields
+        </span>
+      </div>
+
+      <label className="block">
+        <span className="sr-only">Template for {noteType.name}</span>
+        <select
+          value={selectedTemplate}
+          onChange={(event) => onTemplateChange(event.target.value as TemplateType)}
+          className="w-full rounded-[8px] border border-border bg-background px-3 py-2 text-[14px] font-medium text-foreground outline-none transition-colors focus:border-foreground/40"
+        >
+          {TEMPLATE_OPTIONS.map((option) => (
+            <option key={option} value={option}>
+              {option === "none" ? "None (keep original)" : `${option.charAt(0).toUpperCase() + option.slice(1)}`}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {selectedTemplate !== "none" && (
+        <TemplateFieldChecklist
+          templateId={selectedTemplate}
+          fieldMappings={fieldMappings}
+        />
+      )}
+
+      {isSuggested && (
+        <p className="mt-2 text-[12px] text-muted-foreground">
+          This template was auto-selected based on detected field roles.
+        </p>
+      )}
+    </div>
+  )
 }
+
+function TemplateFieldChecklist({
+  templateId,
+  fieldMappings,
+}: {
+  templateId: Exclude<TemplateType, "none">
+  fieldMappings: Record<string, FieldRole>
+}) {
+  const template = TEMPLATES[templateId]
+  const presentRoles = new Set(Object.values(fieldMappings))
+
+  return (
+    <div className="mt-3 space-y-2">
+      {template.requiredRoles.length > 0 && (
+        <div>
+          <p className="mb-1 font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+            Required
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {template.requiredRoles.map((role) => {
+              const present = presentRoles.has(role)
+              return (
+                <span
+                  key={role}
+                  className={`rounded-[6px] px-2 py-0.5 font-mono text-[11px] ${
+                    present
+                      ? "bg-[rgba(74,122,78,0.12)] text-[#2E5C33]"
+                      : "bg-[rgba(217,58,38,0.10)] text-[#A8321A]"
+                  }`}
+                >
+                  {present ? "✓" : "✗"} {getFieldRoleLabel(role)}
+                </span>
+              )
+            })}
+          </div>
+        </div>
+      )}
+      {template.optionalRoles.length > 0 && (
+        <div>
+          <p className="mb-1 font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+            Optional
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {template.optionalRoles.map((role) => {
+              const present = presentRoles.has(role)
+              return (
+                <span
+                  key={role}
+                  className={`rounded-[6px] px-2 py-0.5 font-mono text-[11px] ${
+                    present
+                      ? "bg-[rgba(74,122,78,0.12)] text-[#2E5C33]"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {present ? "✓" : "−"} {getFieldRoleLabel(role)}
+                </span>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ---------- diff components ---------- */
 
 function PreviewPane({
   title,
   frontHtml,
   backHtml,
   changed,
+  extraStyles = "",
+  isLoading = false,
 }: {
   title: string
   frontHtml: string
   backHtml: string
   changed: boolean
+  extraStyles?: string
+  isLoading?: boolean
 }) {
   return (
     <div className="rounded-[12px] border border-border bg-background/60 p-4">
@@ -724,17 +1318,19 @@ function PreviewPane({
           className="rounded-[6px] border border-border bg-muted px-2 py-0.5 font-mono text-[11px] text-muted-foreground"
           data-changed={changed}
         >
-          {changed ? "changed" : "unchanged"}
+          {isLoading ? "computing…" : changed ? "changed" : "unchanged"}
         </span>
       </div>
       <div className="grid gap-3">
         <PreviewFrame
           title="Front"
-          html={createPreviewDocument({ title: `${title} front`, body: frontHtml })}
+          html={createPreviewDocument({ title: `${title} front`, body: frontHtml, extraStyles })}
+          isLoading={isLoading}
         />
         <PreviewFrame
           title="Back"
-          html={createPreviewDocument({ title: `${title} back`, body: backHtml })}
+          html={createPreviewDocument({ title: `${title} back`, body: backHtml, extraStyles })}
+          isLoading={isLoading}
         />
       </div>
     </div>
@@ -758,9 +1354,16 @@ function FieldDiffPanel({ diffs }: { diffs: FieldDiff[] }) {
         <div className="mt-3 space-y-3">
           {diffs.map((diff) => (
             <div key={diff.name} className="rounded-[8px] border border-border bg-card p-3">
-              <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-                {diff.name}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                  {diff.name}
+                </p>
+                {diff.moved && (
+                  <span className="rounded-[999px] bg-[rgba(184,135,58,0.12)] px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.04em] text-[#8A6528]">
+                    reordered
+                  </span>
+                )}
+              </div>
               <div className="mt-2 grid gap-2 md:grid-cols-2">
                 <DiffValue label="Before" value={diff.before} tone="before" />
                 <DiffValue label="After" value={diff.after} tone="after" />
@@ -797,18 +1400,32 @@ function DiffValue({
   )
 }
 
-function PreviewFrame({ title, html }: { title: string; html: string }) {
+function PreviewFrame({
+  title,
+  html,
+  isLoading = false,
+}: {
+  title: string
+  html: string
+  isLoading?: boolean
+}) {
   return (
     <div className="overflow-hidden rounded-[12px] border border-border bg-background">
       <div className="border-b border-border px-4 py-2 font-mono text-[12px] font-medium text-muted-foreground">
         {title}
       </div>
-      <iframe
-        title={`${title} card preview`}
-        sandbox=""
-        srcDoc={html}
-        className="h-64 w-full bg-background"
-      />
+      {isLoading ? (
+        <div className="flex h-64 items-center justify-center bg-background">
+          <LoaderCircle className="size-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <iframe
+          title={`${title} card preview`}
+          sandbox=""
+          srcDoc={html}
+          className="h-64 w-full bg-background"
+        />
+      )}
     </div>
   )
 }

@@ -462,7 +462,7 @@ Each phase is independently shippable. Do not start the next phase until the cur
 - Auto-backup on every import
 - Dry-run required before bulk apply
 - Transactional batches with per-card error isolation
-- Open source from day one (license: MIT or Apache 2.0, decide before launch)
+- Open source from day one (license: Apache 2.0)
 - Sentry error tracking in production
 - No analytics without opt-in
 - Key masking by default in UI

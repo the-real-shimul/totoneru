@@ -1,99 +1,164 @@
 # totoneru
 
-Totoneru is a local-first Anki deck transformation tool for Japanese learners. You import a deck, inspect and reshape it visually or with controlled AI prompts, dry-run the results, and export a clean `.apkg` back to Anki without sending your deck or API key through our server.
+> Transform your Anki deck in the browser. Local-first. Open source. Bring your own AI key.
 
-## Status
+[![CI](https://github.com/the-real-shimul/totoneru/actions/workflows/ci.yml/badge.svg)](https://github.com/the-real-shimul/totoneru/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](./LICENSE)
 
-The project is in early implementation. Foundation work is complete, and the next build target is Phase 1 deck parsing.
+**totoneru** is a visual transformation and controlled editing system for Anki decks, built for intermediate-to-advanced Japanese learners. Import any `.apkg`, reshape it with built-in transformations or custom AI prompts, preview the results side-by-side, and export a clean deck back to Anki — all without your data ever leaving your browser.
 
-- Current progress: [PROGRESS.md](/Users/shimul/Documents/Claude%20Playground/totoneru/PROGRESS.md)
-- Full product and architecture spec: [PROJECT_SPEC.md](/Users/shimul/Documents/Claude%20Playground/totoneru/PROJECT_SPEC.md)
-- AI-agent working rules: [agents.md](/Users/shimul/Documents/Claude%20Playground/totoneru/agents.md)
+---
+
+## What it does
+
+- **Import** any Anki `.apkg` (`collection.anki21b` only)
+- **Auto-backup** the original to your browser before anything else happens
+- **Map fields** heuristically — expression, reading, meaning, sentence, translation, audio
+- **Choose a template** — Vocabulary or Sentence layouts with structured preview
+- **Transform** with built-in tools — furigana generation, HTML cleaner, field normalizer
+- **Transform with AI** — run custom prompts against your own API key (OpenAI, Anthropic, Groq, OpenRouter, etc.)
+- **Dry-run** on 5 sample cards before committing to the full deck
+- **Stage changes** transactionally — abort, retry failed cards, or discard
+- **Export** a verified `.apkg` with only the changed notes updated
 
 ## Core promises
 
-- Client-side only for deck data and API keys
-- Automatic backup on every import
-- Dry-run before bulk apply
-- Transactional writes until the user confirms
-- Clear separation between data, behavior, and presentation
+- **Client-side only** — your deck and API key never touch our servers
+- **Auto-backup on every import** — download the untouched original at any time
+- **Dry-run before bulk apply** — see exactly what changes before committing
+- **Transactional writes** — stage everything, confirm once, export cleanly
+- **No account, no tracking without consent** — opt-in analytics only
+
+## Quick start
+
+Visit [totoneru.vercel.app](https://totoneru.vercel.app) (or your deployed URL) and drop an `.apkg` file. No signup required.
 
 ## How it works
 
-1. Import an Anki `.apkg` file in the browser.
-2. Save the original package to IndexedDB as a local backup.
-3. Parse the package client-side into notes, fields, note types, templates, and media.
-4. Let the user map fields, choose a template, and preview transformations.
-5. Stage all changes before commit so the canonical deck stays untouched until confirmation.
-6. Export a transformed `.apkg` plus access to the original backup.
-
-## Data flow
-
-```text
-Anki .apkg
-  -> browser import
-  -> local backup in IndexedDB
-  -> client-side parsing in Web Workers
-  -> preview and staged transformations
-  -> optional direct API calls from browser to user-provided AI endpoint
-  -> confirmed export back to .apkg
+```
+User drops .apkg
+    |
+    v
+[Auto-backup to IndexedDB]
+    |
+    v
+[Web Worker: jszip + sql.js]
+    |
+    v
+[Parse notes, fields, templates, media]
+    |
+    v
+[Heuristic field role detection]
+    |
+    v
+[User edits mappings + selects template]
+    |
+    v
+[Preview: original vs transformed]
+    |
+    v
+[Dry-run on 5 sample cards]
+    |
+    v
+[User confirms dry-run]
+    |
+    v
+[Bulk batch with per-card error isolation]
+    |
+    v
+[Stage all changes in IndexedDB]
+    |
+    v
+[User clicks Export]
+    |
+    v
+[Re-open original SQLite from backup]
+    |
+    v
+[UPDATE only changed notes]
+    |
+    v
+[Re-zip with original media]
+    |
+    v
+[Verify by re-opening exported DB]
+    |
+    v
+[Download transformed.apkg]
 ```
 
-The app is designed so deck contents and API keys do not pass through a Totoneru-controlled backend.
+## Built-in transformations
+
+| Transformation | What it does |
+|---|---|
+| **Furigana generation** | Tokenizes Japanese with kuromoji.js and wraps kanji in `<ruby>` tags |
+| **HTML cleaner** | Strips `<font>`, `<span>`, `<div>`, `<p>` tags and `style`/`class` attributes |
+| **Field normalizer** | Normalizes `\r\n` to `\n`, collapses whitespace, trims ends |
+
+## AI features
+
+- Bring your own API key — stored in your browser's IndexedDB
+- Supports any OpenAI-compatible endpoint plus native Anthropic
+- Prompt library with 4 curated starters + custom prompt editor
+- Cost estimation before running
+- Per-card error isolation with exponential backoff on rate limits
 
 ## Tech stack
 
-- Next.js App Router + TypeScript
-- Tailwind CSS + shadcn/ui primitives
-- `jszip` + `sql.js` for `.apkg` and SQLite parsing
-- Web Workers for parsing and tokenization
-- IndexedDB via `idb` for backups and local state
-- Sentry for error reporting
-- PostHog for opt-in analytics only
+- **Framework:** Next.js 16 (App Router) + TypeScript
+- **Styling:** Tailwind CSS + shadcn/ui + Radix UI primitives
+- **`.apkg` parsing:** jszip + sql.js (SQLite WASM) in Web Workers
+- **Japanese tokenization:** kuromoji.js (Web Worker, offline)
+- **Client storage:** IndexedDB via `idb`
+- **AI calls:** Direct browser → user's endpoint (no proxy)
+- **Error tracking:** Sentry (production only)
+- **Analytics:** PostHog (opt-in only)
 
 ## Local development
 
-1. Install dependencies with `npm install`.
-2. Copy `.env.local.example` to `.env.local`.
-3. Add whatever values you have available.
+```bash
+# Install dependencies
+npm install
 
-Sentry and PostHog credentials are optional for local work. The app can build without them.
+# Set up environment variables
+cp .env.local.example .env.local
+# Add your Sentry / PostHog credentials (optional for local work)
 
-## Available scripts
+# Start dev server
+npm run dev
+```
 
-- `npm run dev` — start the local dev server
-- `npm run typecheck` — run TypeScript without emitting files
-- `npm run lint` — run ESLint
-- `npm run build` — create a production build
-- `npm run start` — serve the production build
+### Required checks before committing
 
-## Environment variables
+```bash
+npm run typecheck   # tsc --noEmit
+npm run lint        # eslint . --max-warnings 0
+npm run build       # next build
+```
 
-See [.env.local.example](/Users/shimul/Documents/Claude%20Playground/totoneru/.env.local.example).
+## Documentation
 
-- `NEXT_PUBLIC_SENTRY_DSN`
-- `SENTRY_ORG`
-- `SENTRY_PROJECT`
-- `SENTRY_AUTH_TOKEN`
-- `NEXT_PUBLIC_POSTHOG_KEY`
-- `NEXT_PUBLIC_POSTHOG_HOST`
+- [How it works](./app/how-it-works/page.tsx) — trust and data flow documentation
+- [Prompt cookbook](./app/prompts/page.tsx) — curated AI prompts and writing guide
+- [Keyboard shortcuts](./app/shortcuts/page.tsx) — accessibility reference
+- [PROGRESS.md](./PROGRESS.md) — build state and session log
+- [PROJECT_SPEC.md](./PROJECT_SPEC.md) — full product spec and architecture
+- [CONTRIBUTING.md](./CONTRIBUTING.md) — contributor guidelines
 
-## Project rules that matter most
+## Roadmap
 
-- No server storage of decks or API keys
-- Support `collection.anki21b` only in MVP
-- Never mutate the canonical deck until explicit confirmation
-- Never skip automatic backup on import
-- Never enable analytics without opt-in consent
+See [PROJECT_SPEC.md §E](./PROJECT_SPEC.md#part-e--future-features) for the full roadmap. Tier 1 candidates:
 
-## Next up
+1. Advanced HTML/CSS editing layer
+2. JMdict / Jisho API data enrichment
+3. Deck analysis and optimization suggestions
+4. SRS preset generator
+5. Batch transformation workflows
 
-The next implementation target is Phase 1 deck parsing, starting with:
+## Contributing
 
-- `S1.1` `jszip` + `sql.js` setup
-- lazy-loaded WASM
-- basic unzip verification
+Read [CONTRIBUTING.md](./CONTRIBUTING.md) first. The project is intentionally scoped — respect the architecture constraints and keep changes surgical.
 
 ## License
 
-This project is released under the Totoneru Source License v1.0. See [LICENSE](/Users/shimul/Documents/Claude%20Playground/totoneru/LICENSE).
+Apache 2.0. See [LICENSE](./LICENSE).

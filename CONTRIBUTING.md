@@ -4,9 +4,9 @@ Thanks for helping build totoneru.
 
 This project is intentionally scoped and opinionated. Before changing code, read the current state and constraints first:
 
-- [PROGRESS.md](/Users/shimul/Documents/Claude%20Playground/totoneru/PROGRESS.md) for what is done and what comes next
-- [PROJECT_SPEC.md](/Users/shimul/Documents/Claude%20Playground/totoneru/PROJECT_SPEC.md) for product and architecture rules
-- [agents.md](/Users/shimul/Documents/Claude%20Playground/totoneru/agents.md) for repo-wide execution guidelines
+- [PROGRESS.md](./PROGRESS.md) for what is done and what comes next
+- [PROJECT_SPEC.md](./PROJECT_SPEC.md) for product and architecture rules
+- [agents.md](./agents.md) for repo-wide execution guidelines
 
 ## Ground rules
 

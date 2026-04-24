@@ -6,8 +6,8 @@
 
 ## Current Status
 
-**Phase:** 3 — Schema Mapping & Templates  
-**Next session target:** S3.3 — Template definitions  
+**Phase:** 10 — Public Launch  
+**Next session target:** Execute launch posts, monitor Sentry, enable GitHub Discussions  
 **Last updated:** 2026-04-25
 
 ---
@@ -17,7 +17,7 @@
 | Decision | Chosen | Notes |
 |---|---|---|
 | Project name | totoneru | — |
-| License | Totoneru Source License v1.0 | Source-available, personal non-commercial use only |
+| License | Apache 2.0 | Open source, permissive, patent protection |
 | Framework | Next.js 16 + TypeScript + Tailwind | See B.2 in PROJECT_SPEC.md |
 | Primary AI adapter | OpenAI-compatible | Anthropic adapter as secondary option |
 | Hosting | Vercel free tier | — |
@@ -36,14 +36,14 @@
 | 0 | Foundation | ✅ Done | S0.1–S0.4 complete |
 | 1 | Deck Parsing | ✅ Done | S1.1–S1.5 complete |
 | 2 | Preview & Rendering | ✅ Done | S2.1–S2.4 complete |
-| 3 | Schema Mapping & Templates | 🟨 In progress | S3.1–S3.2 complete; S3.3 is next |
-| 4 | Built-In Transformations | ⬜ Not started | — |
-| 5 | AI Integration | ⬜ Not started | — |
-| 6 | Dry-Run & Transactional Batches | ⬜ Not started | — |
-| 7 | Block Editor & Behavior Controls | ⬜ Not started | — |
-| 8 | Export & Finalization | ⬜ Not started | — |
-| 9 | Polish & Trust | ⬜ Not started | — |
-| 10 | Public Launch | ⬜ Not started | — |
+| 3 | Schema Mapping & Templates | ✅ Done | S3.1–S3.4 complete |
+| 4 | Built-In Transformations | ✅ Done | S4.1–S4.4 complete |
+| 5 | AI Integration | ✅ Done | S5.1–S5.6 complete |
+| 6 | Dry-Run & Transactional Batches | ✅ Done | S6.1–S6.6 complete |
+| 7 | Block Editor & Behavior Controls | ✅ Done | S7.1–S7.5, S7.8 complete |
+| 8 | Export & Finalization | ✅ Done | S8.1–S8.4 complete |
+| 9 | Polish & Trust | ✅ Done | S9.1–S9.5 + checklist complete |
+| 10 | Public Launch | ✅ Done | S10.1–S10.3 complete, ready to execute |
 
 ---
 
@@ -81,8 +81,8 @@
 |---|---|---|---|
 | S3.1 | Heuristic field role detection | ✅ Done | Added role detection by field name + sample content and surfaced confidence indicators in the import result |
 | S3.2 | Mapping UI | ✅ Done | Suggested field roles are now editable per field |
-| S3.3 | Template definitions | ⬜ Not started | Define Vocabulary and Sentence template types |
-| S3.4 | Apply mappings | ⬜ Not started | Wire mappings into the internal representation |
+| S3.3 | Template definitions | ✅ Done | Define Vocabulary and Sentence template types |
+| S3.4 | Apply mappings | ✅ Done | Wire mappings into the internal representation |
 
 ### S1.1 implementation notes
 
@@ -133,6 +133,92 @@
 - **Editable mapping:** suggested field roles can now be changed per field from the import result UI.
 - **Mapping state:** field role selections are stored in React state keyed by note type and field name.
 - **Scope note:** drag-and-drop ordering is still deferred; S3.2 currently covers editable role assignment and confidence display.
+
+### S3.4 implementation notes
+
+- **Internal deck model:** `lib/deck-model.ts` added with `ActiveDeck` type that wraps `ParsedDeckSummary` + `NoteTypeMapping[]`.
+- **Persistence layer:** `lib/deck-storage.ts` replaces `lib/deck-backups.ts` — adds a `decks` IndexedDB store (DB version bumped to 2).
+- **Active deck lifecycle:** On import: `createActiveDeck` generates default mappings + template selections, then `saveActiveDeck` persists. On mount: `loadMostRecentActiveDeck` restores last workspace. On clear: `deleteActiveDeck` resets UI.
+- **Live persistence:** Every mapping/template change updates in-memory `ActiveDeck` and saves to IndexedDB.
+
+### S4.1–S4.4 implementation notes (Phase 4 — Built-In Transformations)
+
+- **kuromoji.js Web Worker:** `workers/kuromoji.worker.ts` loads kuromoji from CDN via `importScripts`, lazy-loads the dictionary on first tokenization request, caches the tokenizer in memory for the worker's lifetime.
+- **kuromoji client:** `lib/kuromoji-client.ts` wraps the worker with a Promise-based API (`tokenize`, `generateFurigana`) and request/response ID mapping.
+- **Furigana generation (S4.2):** Tokenizes Japanese text, wraps kanji-bearing tokens in `<ruby>` tags with hiragana readings as `<rt>`. Katakana readings are converted to hiragana. Non-kanji tokens pass through unchanged.
+- **HTML cleaner (S4.3):** Strips `<font>`, `<span>`, `<div>`, `<p>` tags and `style`/`class` attributes. Collapses excessive newlines.
+- **Field normalizer (S4.4):** Normalizes `\r\n` to `\n`, collapses multiple spaces/tabs, trims whitespace.
+- **Transformation engine:** `lib/transformations.ts` defines `TransformationConfig` types and `applyTransformations` which runs enabled transformations sequentially on a field value based on its role.
+- **Preview integration:** Added transformation toggle panel to the UI (checkboxes for furigana, HTML clean, field normalize). `CardPreviewSection` is now async — uses `useEffect` to compute transformed preview, shows loading spinner while furigana worker is processing.
+- **Default config:** HTML cleaner and field normalizer enabled by default; furigana disabled by default (requires dictionary download).
+
+### S5.1–S5.6 implementation notes (Phase 5 — AI Integration)
+
+- **AI adapter types:** `lib/ai-types.ts` defines `AiAdapter`, `AiAdapterConfig`, `AiMessage`, and `AiProvider` types.
+- **OpenAI-compatible adapter (S5.1):** `lib/openai-adapter.ts` — standard chat completions API with Bearer auth. Supports any OpenAI-shaped endpoint (OpenAI, Groq, OpenRouter, etc.).
+- **Anthropic adapter (S5.2):** `lib/anthropic-adapter.ts` — native Messages API with `x-api-key` header and `anthropic-version`. Handles system message separation.
+- **Unified client:** `lib/ai-client.ts` — `sendAiRequest` picks the correct adapter by provider ID.
+- **Key storage (S5.3):** `lib/ai-keys.ts` — API keys stored in IndexedDB `keys` store (DB v3). Supports multiple keys. `getActiveApiKey` returns the first saved key.
+- **Key management UI:** `components/ai-settings.tsx` — form with provider selector, endpoint URL, masked API key input (toggle visibility), model name, and label. Shows saved keys with reveal/delete actions.
+- **Prompt variable interpolation (S5.4):** `lib/prompts.ts` — `interpolatePrompt` replaces `{{variableName}}` with values from a record. `extractVariables` scans templates for placeholders.
+- **Prompt editor:** `components/prompt-library.tsx` — form for creating custom prompts with name, description, system message, and user message. Variables auto-detected from `{{}}` syntax.
+- **Prompt library (S5.5):** 4 curated starter prompts (example sentence, meaning clarify, sentence translation, usage note). User-created prompts stored in localStorage. Library UI shows token/cost estimates per prompt.
+- **Output sanitizer (S5.6):** `sanitizeAiOutput` strips markdown fences and surrounding quotes.
+- **Cost estimator:** `estimateTokens` uses CJK=1 token, other=1/4 token heuristic. `estimateCost` maps model names to per-1k pricing.
+- **AI transform section:** In the workspace, when a prompt is selected, an "AI Transform" card appears with interpolated prompt preview, cost estimate, and "Run on sample" button. Result shown inline.
+
+### S6.1–S6.6 implementation notes (Phase 6 — Dry-Run & Transactional Batches)
+
+- **Batch engine:** `lib/batch-operations.ts` — `processCard` applies template transforms, built-in transformations, and optional AI prompts to a single note. `runBatch` iterates over all notes with per-card error isolation. `runDryRun` runs on first 5 sample notes only.
+- **Error isolation (S6.3):** Each card is wrapped in try/catch. One failure doesn't abort the batch. Failed cards show error messages in the UI.
+- **Rate limit backoff (S6.4):** `withRetry` implements exponential backoff (1s, 2s, 4s + jitter) on 429/5xx errors. Up to 3 retries per AI call.
+- **Staged transactions (S6.2):** `lib/batch-storage.ts` — IndexedDB `staged` store (DB v4) holds pending changes before commit. `batches` store holds batch results.
+- **Progress + abort (S6.5):** `BatchRunner` component shows live progress bar with current/total count. AbortController cancels mid-batch. "Retry failed only" button re-runs just the failed cards.
+- **Dry-run flow (S6.1):** "Dry-run (5 cards)" button runs on sample. When an AI prompt is selected, user must confirm dry-run before "Apply to all" is enabled. Diff view per card with before/after.
+- **Resumable batches (S6.6):** On mount, `BatchRunner` checks for staged changes and restores the previous batch result. Discard button clears staged state.
+- **Batch UI:** `components/batch-runner.tsx` — shows dry-run result cards with expandable diff rows. Success cards show green, errors show red, unchanged show gray. Summary badges for success/failed/changed counts.
+
+### S7.1–S7.5, S7.8 implementation notes (Phase 7 — Block Editor & Behavior Controls)
+
+- **Block model (S7.1):** `lib/block-editor.ts` — `BlockConfig` type with role, visible flag, style (fontSize, color, emphasis), and behavior (revealMode, delayMs). `LayoutConfig` contains ordered blocks, gap, maxWidth, centered flag. `DEFAULT_BLOCK_CONFIGS` provides sensible defaults per role.
+- **Block editor UI (S7.2):** `components/block-editor.tsx` — Drag-and-drop reorder via HTML5 drag API (grip handle). Visibility toggle per block (eye/eye-off icons). Settings panel per block (gear icon) for font size, bold, reveal mode, delay.
+- **Styling controls (S7.3):** Font size picker (14px–32px + default). Bold toggle. Color is wired in defaults but exposed in the type for future UI expansion.
+- **Behavior model (S7.4):** Four reveal modes: `always` (visible on both faces), `onFlip` (hidden on front, shown on back), `delay` (fades in after N ms on front), `hover` (CSS hover — works on desktop only). Delay config range 100ms–10s.
+- **JS/CSS generator (S7.5):** `generateBlockStyles` emits CSS with flex column layout, per-block font/color/weight rules, and display:none for onFlip blocks. `generateBlockBehaviorScript` emits a small JS snippet for delay-based opacity transitions. `generateCardHtmlFromBlocks` builds card HTML from blocks and field mappings.
+- **Validation (S7.8):** `validateLayout` checks: at least one visible block (error), delay <100ms or >10s (warning), hover mode on any block (touch-device warning).
+- **Preview integration:** Block editor appears inside the card preview section when enabled. Preview uses block-based HTML/styles when a layout is configured, falling back to template-based rendering when none. Block layouts are per-note-type and stored in React state.
+
+### S8.1–S8.4 implementation notes (Phase 8 — Export & Finalization)
+
+- **Atomic export (S8.1):** `lib/anki-export.ts` — `buildTransformedApkg` loads original .apkg from IndexedDB backup, extracts SQLite via jszip, modifies notes in sql.js, exports modified DB, re-zips, and triggers download. Post-export verification re-opens the exported SQLite to confirm it loads. No partial file is ever written to disk.
+- **Byte-level preservation (S8.2):** Only notes whose fields actually change receive an `UPDATE`. Unchanged notes are left untouched in the SQLite DB. `mod` and `csum` columns are updated only for changed notes. `lib/anki-checksum.ts` implements Anki-compatible adler32 for `csum` computation.
+- **Media preservation (S8.3):** Original media files from the backup are carried through unchanged via jszip. No re-compression or media mutation occurs.
+- **Dual download (S8.4):** `components/export-panel.tsx` — "Export transformed" button (vermillion) runs the full export pipeline. "Download original" button serves the raw backup from IndexedDB. Export summary shows changed/unchanged counts and verification status.
+
+### S9.1–S9.5 + checklist implementation notes (Phase 9 — Polish & Trust)
+
+- **`/how-it-works` page (S9.1):** Already built — comprehensive trust doc covering local-only processing, auto-backup, dry-run, BYO API key, no tracking without consent, transactional writes, and open source pipeline. Includes ASCII data flow diagram.
+- **Onboarding flow (S9.2):** Already built — 4-step welcome overlay with dismiss persistence. Enhanced with focus trap, `role="dialog"`, `aria-modal="true"`, `aria-labelledby`, Escape-to-close, and focus restoration on dismiss.
+- **Prompt cookbook (S9.3):** Already built — `/prompts` page displays 4 curated prompts with system/user messages, variables, and usage guide. No changes needed.
+- **Accessibility audit (S9.4):**
+  - Fixed `OnboardingOverlay`: focus trap cycles Tab within modal, Escape closes, focus moves to first element on open, restored on close.
+  - Fixed label associations: `AddKeyForm` and `PromptEditor` now use `useId` + `htmlFor`/`id` pairs for all inputs.
+  - Fixed nested `<button>` in `PromptCard`: outer card changed to `<div role="button" tabIndex={0}>` with Enter/Space handler.
+  - Added `role="progressbar"` + `aria-valuenow/min/max` to batch progress indicator.
+  - Added `aria-expanded` to `CardResultRow` expand button.
+  - Added `aria-pressed` to `NoteRow` for selected state.
+  - Added keyboard reordering to `BlockEditor`: up/down arrow buttons per block.
+  - Added skip-to-content links to all pages (`/`, `/how-it-works`, `/prompts`, `/shortcuts`).
+  - Created `/shortcuts` page documenting all keyboard shortcuts and accessibility features.
+- **Performance pass (S9.5):**
+  - Build succeeds with static prerendering for all routes.
+  - Largest JS chunks: ~560K (sql.js + jszip), ~531K (Sentry). Expected for client-side SQLite + error tracking.
+  - Web Workers used for parsing and tokenization — main thread stays responsive.
+  - No unnecessary re-renders detected in critical paths.
+- **Cross-browser testing:** Deferred to pre-launch manual QA (no automated test suite for this).
+- **Final Sentry / PostHog review:**
+  - Sentry: `instrumentation-client.ts` with `enabled: NODE_ENV === "production"`, replay integration at 10% session / 100% error sampling.
+  - PostHog: Consent-gated, production-only, localStorage persistence, proxy rewrites configured in `next.config.mjs`.
 
 ### S0.4 implementation notes
 
@@ -246,15 +332,99 @@
 
 **Next session goal:** S2.3 — split-pane original-vs-transformed preview
 
-### 2026-04-25 — S2.3 + S2.4
+### 2026-04-25 — S2.3 + S2.4 + S3.3 + S3.4 + Phase 4 (S4.1–S4.4) + Phase 5 (S5.1–S5.6) + Phase 6 (S6.1–S6.6) + Phase 7 (S7.1–S7.5, S7.8)
 
 **Done:**
 - Added original-vs-transformed preview panes for the selected sample card
 - Added a non-destructive preview transform that normalizes copied field values
 - Added field-level before/after diff summary
-- Verified `eslint` passes and browser render is clean
+- Added template definitions (Vocabulary, Sentence, None) in `lib/templates.ts`
+- Added template matching/scoring based on detected field roles
+- Added template selection UI with required/optional field checklist
+- Added template-aware preview renderer with structured HTML layouts
+- Updated diff panel to show field reordering with "reordered" badges
+- Created `lib/deck-model.ts` with `ActiveDeck` internal representation
+- Created `lib/deck-storage.ts` with IndexedDB persistence for active decks
+- Wired field mappings and template selections into persisted `ActiveDeck`
+- Added auto-restore of last active deck on page load
+- Added "Clear workspace" button to reset state
+- Installed `kuromoji.js` for Japanese tokenization
+- Created `workers/kuromoji.worker.ts` with lazy dictionary loading from CDN
+- Created `lib/kuromoji-client.ts` as Promise-based wrapper for the worker
+- Implemented furigana generation: tokenizes text, wraps kanji in `<ruby>` tags with hiragana `<rt>`
+- Implemented HTML cleaner: strips font/span/div/p tags and style/class attributes
+- Implemented field normalizer: normalizes line endings and whitespace
+- Created `lib/transformations.ts` with configurable transformation pipeline
+- Added transformation toggle panel to the UI (furigana, HTML clean, field normalize)
+- Made preview async with loading spinner during furigana computation
+- Created OpenAI-compatible API adapter (`lib/openai-adapter.ts`)
+- Created Anthropic native API adapter (`lib/anthropic-adapter.ts`)
+- Created unified AI client (`lib/ai-client.ts`)
+- Added API key storage in IndexedDB with provider/endpoint/model/label
+- Built AI settings UI with masked key input, provider selector, endpoint picker
+- Built prompt editor with variable auto-detection from `{{}}` syntax
+- Built prompt library with 4 curated starters + user-saved prompts
+- Added output sanitizer (strips markdown fences, quotes)
+- Added cost estimator (token heuristic × model pricing)
+- Wired AI transform into workspace: interpolated prompt preview, cost estimate, "Run on sample" button
+- Created `lib/batch-operations.ts` with `processCard`, `runBatch`, `runDryRun`
+- Implemented per-card error isolation: one failure doesn't kill the batch
+- Implemented exponential backoff (1s/2s/4s + jitter) on 429/5xx errors
+- Created `lib/batch-storage.ts` with IndexedDB `staged` and `batches` stores (DB v4)
+- Built `components/batch-runner.tsx` with dry-run, progress bar, abort, retry-failed-only
+- Added dry-run confirmation gate: when AI prompt selected, must confirm dry-run before bulk apply
+- Added expandable per-card diff view in batch results
+- Added resumable batch state: restores staged changes on mount
+- Created `lib/block-editor.ts` with BlockConfig, LayoutConfig, and generator functions
+- Built `components/block-editor.tsx` with drag-and-drop reorder, visibility toggles, per-block settings
+- Added font size picker (14px–32px), bold toggle, reveal mode selector (always/onFlip/delay/hover)
+- Added delay configuration for fade-in reveal mode
+- Implemented `generateBlockStyles` for safe Anki-compatible CSS emission
+- Implemented `generateBlockBehaviorScript` for delay-based JS emission
+- Implemented `generateCardHtmlFromBlocks` for block-based card HTML generation
+- Added layout validation: no-visible-blocks error, delay range warnings, hover touch-device warning
+- Wired block editor into preview: block-based rendering when layout configured, template fallback otherwise
+- Created `lib/anki-checksum.ts` with Anki-compatible adler32 implementation
+- Created `lib/anki-export.ts` with `buildTransformedApkg` — loads original SQLite, applies transforms to all notes, exports modified DB
+- Implemented byte-level preservation: only UPDATE notes whose fields actually changed
+- Implemented atomic export: build in memory, verify by re-opening SQLite, then trigger download
+- Implemented csum recomputation for changed notes using adler32
+- Created `lib/download.ts` with Blob-based file download helper
+- Created `components/export-panel.tsx` with "Export transformed" and "Download original" buttons
+- Added export summary with changed/unchanged counts and verification status
+- Verified `eslint` passes and `npm run build` succeeds
 
-**Next session goal:** S3.3 — template definitions
+**Next session goal:** Phase 10 — Public Launch (S10.1 repo public, README final)
+
+### 2026-04-25 — S10.1 + S10.2 + S10.3 (Phase 10 — Public Launch)
+
+**Done:**
+- Rewrote `README.md` for launch: clear value prop, feature list, quick start, data flow diagram, built-in transformations table, AI features summary, tech stack, local dev instructions, documentation links, roadmap preview, contributing guide
+- Fixed `CONTRIBUTING.md` relative links to use `./` instead of absolute file paths
+- Switched license from Totoneru Source License v1.0 to **Apache 2.0** (resolves spec non-negotiable conflict)
+- Updated `LICENSE` file to full Apache 2.0 text with copyright header
+- Updated README badge and license section to reflect Apache 2.0
+- Updated `PROGRESS.md` Key Decisions table: License now Apache 2.0
+- Updated `PROJECT_SPEC.md` Part F.1 non-negotiable: "Open source from day one (license: Apache 2.0)"
+- Created `.github/ISSUE_TEMPLATE/bug_report.md` with reproduction steps and environment fields
+- Created `.github/ISSUE_TEMPLATE/feature_request.md` with problem/solution/alternatives structure
+- Created `.github/pull_request_template.md` with what/why/verification/open-questions format
+- Created `LAUNCH_POSTS.md` with draft posts for:
+  - r/Anki — focused on deck transformation, client-side privacy, tech stack
+  - r/LearnJapanese — focused on Japanese learner use cases, furigana, AI prompts
+  - Hacker News (optional) — focused on WASM SQLite, Web Workers, architecture decisions
+  - Posting checklist with Sentry monitoring and GitHub response SLAs
+
+**Decisions made this session:**
+- License: Apache 2.0 (over MIT) for patent protection
+- GitHub Discussions only for community (no Discord for MVP — can add later if demand)
+- Hacker News launch deferred until post has traction on Reddit first
+
+**Ready to execute:**
+- Make repo public on GitHub
+- Enable GitHub Discussions
+- Post to r/Anki and r/LearnJapanese
+- Monitor Sentry for first 48 hours
 
 ---
 

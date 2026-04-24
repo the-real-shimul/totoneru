@@ -46,9 +46,11 @@ export function renderAnkiTemplate({
 export function createPreviewDocument({
   body,
   title,
+  extraStyles = "",
 }: {
   body: string
   title: string
+  extraStyles?: string
 }) {
   return `<!doctype html>
 <html>
@@ -85,6 +87,8 @@ export function createPreviewDocument({
       img, audio, video {
         max-width: 100%;
       }
+
+      ${extraStyles}
     </style>
     <title>${escapeHtml(title)}</title>
   </head>
