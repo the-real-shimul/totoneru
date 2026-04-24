@@ -37,6 +37,45 @@ function isZstdFrame(bytes: Uint8Array) {
   )
 }
 
+function createZstdStoredFrame(bytes: Uint8Array) {
+  const maxBlockSize = 128 * 1024
+  const blockCount = Math.max(1, Math.ceil(bytes.length / maxBlockSize))
+  const output = new Uint8Array(9 + blockCount * 3 + bytes.length)
+  let offset = 0
+
+  output.set([0x28, 0xb5, 0x2f, 0xfd], offset)
+  offset += 4
+
+  // Single-segment frame with 4-byte content size, no checksum, no dictionary.
+  output[offset++] = 0xa0
+  output[offset++] = bytes.length & 0xff
+  output[offset++] = (bytes.length >>> 8) & 0xff
+  output[offset++] = (bytes.length >>> 16) & 0xff
+  output[offset++] = (bytes.length >>> 24) & 0xff
+
+  for (let start = 0; start < bytes.length || start === 0; start += maxBlockSize) {
+    const remaining = bytes.length - start
+    const blockSize = Math.max(0, Math.min(maxBlockSize, remaining))
+    const isLast = start + blockSize >= bytes.length
+    const header = (blockSize << 3) | (isLast ? 1 : 0)
+
+    output[offset++] = header & 0xff
+    output[offset++] = (header >>> 8) & 0xff
+    output[offset++] = (header >>> 16) & 0xff
+
+    if (blockSize > 0) {
+      output.set(bytes.subarray(start, start + blockSize), offset)
+      offset += blockSize
+    }
+
+    if (isLast) {
+      break
+    }
+  }
+
+  return output.subarray(0, offset)
+}
+
 async function decompressIfNeeded(bytes: Uint8Array) {
   if (!isZstdFrame(bytes)) {
     return bytes
@@ -80,6 +119,7 @@ export async function buildTransformedApkg(
     }
 
     const rawCollectionBytes = await collectionEntry.async("uint8array")
+    const collectionWasCompressed = isZstdFrame(rawCollectionBytes)
     const collectionBytes = await decompressIfNeeded(rawCollectionBytes)
     const SQL = await getSql()
     const db = new SQL.Database(collectionBytes)
@@ -195,11 +235,15 @@ export async function buildTransformedApkg(
 
       const exported = db.export()
       const newCollectionBytes = new Uint8Array(exported)
+      const replacementCollectionBytes = collectionWasCompressed
+        ? createZstdStoredFrame(newCollectionBytes)
+        : newCollectionBytes
 
-      // Verify: can we re-open the exported DB?
+      // Verify: can Anki-style decompression and SQLite opening both succeed?
       let verified = false
       try {
-        const verifyDb = new SQL.Database(newCollectionBytes)
+        const verifyCollectionBytes = await decompressIfNeeded(replacementCollectionBytes)
+        const verifyDb = new SQL.Database(verifyCollectionBytes)
         const verifyResult = verifyDb.exec("SELECT count(*) FROM notes")
         if (verifyResult.length > 0) {
           verified = true
@@ -210,7 +254,7 @@ export async function buildTransformedApkg(
       }
 
       // Replace collection in zip
-      zip.file("collection.anki21b", newCollectionBytes)
+      zip.file(collectionEntry.name, replacementCollectionBytes)
 
       const newZipBuffer = await zip.generateAsync({ type: "arraybuffer" })
 
