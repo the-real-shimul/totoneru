@@ -7,7 +7,7 @@
 ## Current Status
 
 **Phase:** 1 — Deck Parsing  
-**Next session target:** S1.1 — `jszip` + `sql.js` setup  
+**Next session target:** S1.2 — SQLite reader (notes, fields, note types)  
 **Last updated:** 2026-04-24
 
 ---
@@ -33,7 +33,7 @@
 |---|---|---|---|
 | Pre-0 | Setup & decisions | ✅ Done | Spec written, decisions locked, repo created |
 | 0 | Foundation | ✅ Done | S0.1–S0.4 complete |
-| 1 | Deck Parsing | ⬜ Next | S1.1 is next |
+| 1 | Deck Parsing | 🔄 In progress | S1.1 complete, S1.2 next |
 | 2 | Preview & Rendering | ⬜ Not started | — |
 | 3 | Schema Mapping & Templates | ⬜ Not started | — |
 | 4 | Built-In Transformations | ⬜ Not started | — |
@@ -55,6 +55,19 @@
 | S0.3 | App shell — header, nav, dark mode toggle in UI | ✅ Done | Starter page replaced with shell scaffold, visible theme toggle added, lint blockers cleaned up |
 | S0.4 | README, CONTRIBUTING, repo CLAUDE.md | ✅ Done | Docs now describe setup, workflow, architecture, and agent handoff |
 
+## Phase 1 — Deck Parsing (current)
+
+| Session | Goal | Status | Notes |
+|---|---|---|---|
+| S1.1 | `jszip` + `sql.js` setup | ✅ Done | Local WASM asset added, browser-side `.apkg` unzip probe built, SQLite schema inspection verified |
+| S1.2 | SQLite reader — extract notes, fields, note types | ⬜ Next | — |
+
+### S1.1 implementation notes
+
+- **Dependencies:** `jszip`, `sql.js`, and `@types/sql.js` added.
+- **Local WASM:** `public/sql-wasm.wasm` copied into the app so SQLite boots fully client-side without remote fetches.
+- **Import probe:** `components/apkg-import-probe.tsx` added and wired into `app/page.tsx`; it accepts an `.apkg`, opens the zip in-browser, finds `collection.anki21b`, initializes `sql.js` lazily, and lists SQLite tables as a proof that parsing can start client-side.
+
 ### S0.4 implementation notes
 
 - **README:** replaced the template placeholder with project positioning, local-first architecture summary, setup instructions, and data flow.
@@ -75,9 +88,9 @@
 
 ### Pending setup (needs human action)
 
-- [ ] Create Sentry project at sentry.io → grab DSN → add to Vercel env vars + GitHub secrets
-- [ ] Create PostHog project at posthog.com → grab key → add to Vercel env vars + GitHub secrets
-- [ ] Add `SENTRY_AUTH_TOKEN` to Vercel env vars (for source map uploads on build)
+- [x] Create Sentry project at sentry.io → grab DSN → add to Vercel env vars + GitHub secrets
+- [x] Create PostHog project at posthog.com → grab key → add to Vercel env vars + GitHub secrets
+- [x] Add `SENTRY_AUTH_TOKEN` to Vercel env vars (for source map uploads on build)
 - [ ] Enable Vercel preview deployments on PRs (link repo in Vercel dashboard)
 - [ ] Set `main` branch protection rule on GitHub (require CI to pass)
 
@@ -124,6 +137,16 @@
 - S0.4: `README.md`, `CONTRIBUTING.md`, and `CLAUDE.md` added and aligned with the spec
 
 **Next session goal:** S1.1 — `jszip` + `sql.js` setup
+
+### 2026-04-24 — S1.1
+
+**Done:**
+- Installed `jszip` and `sql.js` for browser-side `.apkg` inspection
+- Added a local `sql.js` WASM asset so SQLite can initialize without external fetches
+- Built an import probe UI that verifies unzip + `collection.anki21b` discovery + SQLite schema access in the browser
+- Verified `typecheck`, `eslint`, and `build` all pass
+
+**Next session goal:** S1.2 — SQLite reader for notes, fields, and note types
 
 ---
 

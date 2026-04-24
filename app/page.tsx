@@ -1,5 +1,6 @@
 import { DatabaseZap, Eye, Sparkles } from "lucide-react"
 
+import { ApkgImportProbe } from "@/components/apkg-import-probe"
 import { HomeCTAs } from "@/components/home-ctas"
 import { ThemeToggle } from "@/components/theme-toggle"
 
@@ -105,6 +106,8 @@ export default function Page() {
               </article>
             ))}
           </div>
+
+          <ApkgImportProbe />
         </section>
 
         <aside className="rounded-[2rem] border border-border/70 bg-card/85 p-6 shadow-sm">
