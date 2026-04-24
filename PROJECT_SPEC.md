@@ -107,7 +107,7 @@ totoneru is a pre-processing layer that sits between the user and Anki, removing
 
 | Layer | Choice | Reason |
 |-------|--------|--------|
-| Framework | Next.js 15 (App Router) + TypeScript | Mature, free hosting via Vercel, good DX |
+| Framework | Next.js 16 (App Router) + TypeScript | Mature, free hosting via Vercel, good DX |
 | Styling | Tailwind CSS | Lean, no component-library bloat |
 | UI primitives | Radix UI | Headless, accessible, no visual lock-in |
 | State | React state + Zustand (if needed) | Avoid global state library until required |
@@ -303,9 +303,9 @@ Each phase is independently shippable. Do not start the next phase until the cur
 
 **Goal:** Boilerplate and dev environment.
 
-- [ ] Scaffold Next.js 15 + TypeScript + Tailwind project
+- [ ] Scaffold Next.js 16 + TypeScript + Tailwind project
 - [ ] Configure ESLint, Prettier, strict TS
-- [ ] Set up GitHub repo with `main` branch protection
+- [ ] Set up GitHub repo with lightweight `main` branch protection (CI required, direct pushes allowed)
 - [ ] Configure Vercel preview deployments on PRs
 - [ ] Add Sentry integration
 - [ ] Add PostHog (opt-in wrapper)
@@ -548,7 +548,7 @@ Each session is 2-4 focused hours with a clear goal and a single scope. Start ea
 
 ### Phase 0 — Foundation (4 sessions)
 
-- **S0.1 Scaffold** — Next.js 15 + TypeScript + Tailwind + ESLint + Prettier. Deploy to Vercel.
+- **S0.1 Scaffold** — Next.js 16 + TypeScript + Tailwind + ESLint + Prettier. Deploy to Vercel.
 - **S0.2 Observability** — Sentry, PostHog (opt-in), GitHub Actions CI.
 - **S0.3 Shell** — App layout, routing, basic navigation, dark mode.
 - **S0.4 Docs** — README, CONTRIBUTING, LICENSE, initial CLAUDE.md.

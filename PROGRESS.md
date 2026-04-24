@@ -7,7 +7,7 @@
 ## Current Status
 
 **Phase:** 1 — Deck Parsing  
-**Next session target:** S1.2 — SQLite reader (notes, fields, note types)  
+**Next session target:** S2.3 — Split-pane original-vs-transformed preview  
 **Last updated:** 2026-04-24
 
 ---
@@ -18,12 +18,13 @@
 |---|---|---|
 | Project name | totoneru | — |
 | License | Totoneru Source License v1.0 | Source-available, personal non-commercial use only |
-| Framework | Next.js 15 + TypeScript + Tailwind | See B.2 in PROJECT_SPEC.md |
+| Framework | Next.js 16 + TypeScript + Tailwind | See B.2 in PROJECT_SPEC.md |
 | Primary AI adapter | OpenAI-compatible | Anthropic adapter as secondary option |
 | Hosting | Vercel free tier | — |
 | Domain | TBD | Buying later |
 | Auth in MVP | None | Explicitly out of scope |
 | Mobile support | Deferred post-MVP | Desktop browsers only |
+| Git workflow | Direct push to `main` allowed | Keep CI checks and lightweight branch protection; PRs are optional |
 
 ---
 
@@ -33,8 +34,8 @@
 |---|---|---|---|
 | Pre-0 | Setup & decisions | ✅ Done | Spec written, decisions locked, repo created |
 | 0 | Foundation | ✅ Done | S0.1–S0.4 complete |
-| 1 | Deck Parsing | 🔄 In progress | S1.1 complete, S1.2 next |
-| 2 | Preview & Rendering | ⬜ Not started | — |
+| 1 | Deck Parsing | ✅ Done | S1.1–S1.5 complete |
+| 2 | Preview & Rendering | 🔄 In progress | S2.1 and S2.2 complete; S2.3 next |
 | 3 | Schema Mapping & Templates | ⬜ Not started | — |
 | 4 | Built-In Transformations | ⬜ Not started | — |
 | 5 | AI Integration | ⬜ Not started | — |
@@ -46,11 +47,11 @@
 
 ---
 
-## Phase 0 — Foundation (current)
+## Phase 0 — Foundation
 
 | Session | Goal | Status | Notes |
 |---|---|---|---|
-| S0.1 | Scaffold Next.js 15 + shadcn + deploy to Vercel | ✅ Done | shadcn preset `b3ES8mGIfA`, Space Grotesk + JetBrains Mono fonts, fixed circular font var bug in globals.css |
+| S0.1 | Scaffold Next.js 16 + shadcn + deploy to Vercel | ✅ Done | shadcn preset `b3ES8mGIfA`, Space Grotesk + JetBrains Mono fonts, fixed circular font var bug in globals.css |
 | S0.2 | Sentry, PostHog (opt-in), GitHub Actions CI | ✅ Done | See notes below |
 | S0.3 | App shell — header, nav, dark mode toggle in UI | ✅ Done | Starter page replaced with shell scaffold, visible theme toggle added, lint blockers cleaned up |
 | S0.4 | README, CONTRIBUTING, repo CLAUDE.md | ✅ Done | Docs now describe setup, workflow, architecture, and agent handoff |
@@ -60,13 +61,44 @@
 | Session | Goal | Status | Notes |
 |---|---|---|---|
 | S1.1 | `jszip` + `sql.js` setup | ✅ Done | Local WASM asset added, browser-side `.apkg` unzip probe built, SQLite schema inspection verified |
-| S1.2 | SQLite reader — extract notes, fields, note types | ⬜ Next | — |
+| S1.2 | SQLite reader — extract notes, fields, note types | ✅ Done | Import probe now reads note rows, note type metadata, field names, and sample field values from `collection.anki21b` |
+| S1.3 | Templates + media parsing | ✅ Done | Parser extracts card template names/formats from note types and parses Anki media manifest entries |
+| S1.4 | Schema detection | ✅ Done | Parser accepts `collection.anki21b` only and rejects older `collection.anki2` / `collection.anki21` packages with a clear error |
+| S1.5 | Web Worker migration + auto-backup | ✅ Done | APKG parsing moved to a Web Worker; original package is saved to IndexedDB before parsing |
+
+## Phase 2 — Preview & Rendering (current)
+
+| Session | Goal | Status | Notes |
+|---|---|---|---|
+| S2.1 | Card browser | ✅ Done | Import result now includes up to 50 sample notes and a selectable browser with previous/next controls |
+| S2.2 | Card renderer | ✅ Done | Selected sample note renders front/back card faces in sandboxed iframes using basic Anki field interpolation |
+| S2.3 | Split-pane preview | ⬜ Next | — |
+| S2.4 | Diff highlighting | ⬜ Queued | — |
 
 ### S1.1 implementation notes
 
 - **Dependencies:** `jszip`, `sql.js`, and `@types/sql.js` added.
 - **Local WASM:** `public/sql-wasm.wasm` copied into the app so SQLite boots fully client-side without remote fetches.
 - **Import probe:** `components/apkg-import-probe.tsx` added and wired into `app/page.tsx`; it accepts an `.apkg`, opens the zip in-browser, finds `collection.anki21b`, initializes `sql.js` lazily, and lists SQLite tables as a proof that parsing can start client-side.
+
+### S1.2 implementation notes
+
+- **SQLite reader:** `components/apkg-import-probe.tsx` now reads from `notes` and `col`, parses note type metadata from the `models` JSON, and splits note field values using Anki's field separator.
+- **Visible proof:** the import probe now shows note count, note type count, aggregate field count, note type definitions, and sample notes with field labels.
+
+### S1.3-S1.5 implementation notes
+
+- **Templates:** `workers/apkg-parser.worker.ts` extracts card template names plus front/back formats from Anki's note type model JSON.
+- **Media:** the worker parses the APKG `media` manifest and returns a media count plus sample archive-name mappings.
+- **Schema gate:** import accepts `collection.anki21b` only; older collection files are rejected with an explicit unsupported-schema error.
+- **Worker parsing:** the UI now sends the deck buffer to `workers/apkg-parser.worker.ts` so zip and SQLite work happen off the main thread.
+- **Auto-backup:** `lib/deck-backups.ts` saves the original `.apkg` to IndexedDB before the parser runs.
+
+### S2.1-S2.2 implementation notes
+
+- **Card browser:** `components/apkg-import-probe.tsx` now lets users select from parsed sample notes and move through them with previous/next controls.
+- **Renderer:** `lib/anki-template-renderer.ts` added for initial Anki template interpolation; selected card front/back render in sandboxed iframes.
+- **Scope note:** current rendering is intentionally basic field interpolation. Full Anki template parity and original/transformed split preview are next-phase work.
 
 ### S0.4 implementation notes
 
@@ -91,17 +123,17 @@
 - [x] Create Sentry project at sentry.io → grab DSN → add to Vercel env vars + GitHub secrets
 - [x] Create PostHog project at posthog.com → grab key → add to Vercel env vars + GitHub secrets
 - [x] Add `SENTRY_AUTH_TOKEN` to Vercel env vars (for source map uploads on build)
-- [ ] Enable Vercel preview deployments on PRs (link repo in Vercel dashboard)
-- [ ] Set `main` branch protection rule on GitHub (require CI to pass)
+- [x] Enable Vercel preview deployments on PRs (link repo in Vercel dashboard)
+- [x] Set `main` branch protection rule on GitHub (require CI to pass)
 
 ---
 
 ## Phase 0 Checklist (from PROJECT_SPEC.md §D)
 
-- [x] Scaffold Next.js 15 + TypeScript + Tailwind project
+- [x] Scaffold Next.js 16 + TypeScript + Tailwind project
 - [x] Configure ESLint, Prettier, strict TS
-- [ ] Set up GitHub repo with `main` branch protection ← needs human action
-- [ ] Configure Vercel preview deployments on PRs ← needs human action
+- [x] Set up GitHub repo with `main` branch protection
+- [x] Configure Vercel preview deployments on PRs
 - [x] Add Sentry integration
 - [x] Add PostHog (opt-in wrapper)
 - [x] Set up basic app shell (header, main content, footer)
@@ -120,7 +152,7 @@
 - LICENSE file created (Totoneru Source License v1.0)
 - GitHub repo initialized and pushed: https://github.com/the-real-shimul/totoneru
 - PROGRESS.md and agents.md created
-- S0.1: Next.js 15 scaffolded with shadcn preset `b3ES8mGIfA`, font circular-reference bug fixed, pushed
+- S0.1: Next.js 16 scaffolded with shadcn preset `b3ES8mGIfA`, font circular-reference bug fixed, pushed
 - S0.2: Sentry + PostHog opt-in + GitHub Actions CI wired up, pushed
 
 **Decisions made this session:**
@@ -145,8 +177,40 @@
 - Added a local `sql.js` WASM asset so SQLite can initialize without external fetches
 - Built an import probe UI that verifies unzip + `collection.anki21b` discovery + SQLite schema access in the browser
 - Verified `typecheck`, `eslint`, and `build` all pass
+- Enabled Vercel preview deployments and lightweight `main` branch protection, then adjusted the workflow back to allow direct pushes to `main` while keeping CI
 
-**Next session goal:** S1.2 — SQLite reader for notes, fields, and note types
+### 2026-04-24 — S1.2
+
+**Done:**
+- Extended the import probe to read actual notes from SQLite instead of only listing tables
+- Parsed note type metadata from `col.models`
+- Mapped sample note rows into labeled field values for browser-side inspection
+- Verified `typecheck` and `eslint` pass cleanly
+
+**Next session goal:** S1.3 — templates and media parsing
+
+### 2026-04-24 — S1.3 + S1.4 + S1.5
+
+**Done:**
+- Parsed card template metadata from Anki note types
+- Parsed the APKG media manifest and displayed media stats/samples
+- Added strict `collection.anki21b` schema detection with clear rejection for older collection files
+- Moved APKG parsing into `workers/apkg-parser.worker.ts`
+- Added original `.apkg` backup storage in IndexedDB before parsing
+- Verified `typecheck`, `eslint`, and `build` all pass
+
+**Next session goal:** Phase 2 — preview and rendering
+
+### 2026-04-24 — S2.1 + S2.2
+
+**Done:**
+- Added a selectable card browser for parsed sample notes
+- Increased parsed sample notes to 50 for more useful browsing
+- Added initial Anki template interpolation helper
+- Rendered selected card front/back faces in sandboxed iframes
+- Verified `typecheck` and `eslint` pass; browser render is clean
+
+**Next session goal:** S2.3 — split-pane original-vs-transformed preview
 
 ---
 
@@ -174,7 +238,7 @@ For full details see `PROJECT_SPEC.md`. Key constraints any agent must respect:
 
 | Layer | Choice |
 |---|---|
-| Framework | Next.js 15 (App Router) + TypeScript |
+| Framework | Next.js 16 (App Router) + TypeScript |
 | Styling | Tailwind CSS + Radix UI via shadcn/ui |
 | `.apkg` parsing | jszip + sql.js (WASM) in Web Workers |
 | Japanese tokenization | kuromoji.js (Web Worker, offline) |

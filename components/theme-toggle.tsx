@@ -1,6 +1,6 @@
 "use client"
 
-import { MoonStar, SunMedium } from "lucide-react"
+import { MoonStar } from "lucide-react"
 import { useTheme } from "next-themes"
 
 import { useAnalytics } from "@/components/analytics-provider"
@@ -9,10 +9,9 @@ import { Button } from "@/components/ui/button"
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme()
   const { capture } = useAnalytics()
-  const isDark = resolvedTheme === "dark"
 
   const handleToggle = () => {
-    const nextTheme = isDark ? "light" : "dark"
+    const nextTheme = resolvedTheme === "dark" ? "light" : "dark"
     setTheme(nextTheme)
     capture("theme_changed", { theme: nextTheme })
   }
@@ -22,12 +21,12 @@ export function ThemeToggle() {
       type="button"
       variant="outline"
       size="sm"
-      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      aria-label="Toggle color mode"
       onClick={handleToggle}
       className="gap-2"
     >
-      {isDark ? <SunMedium /> : <MoonStar />}
-      <span>{isDark ? "Light mode" : "Dark mode"}</span>
+      <MoonStar />
+      <span>Theme</span>
     </Button>
   )
 }
