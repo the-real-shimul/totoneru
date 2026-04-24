@@ -4,6 +4,7 @@ import { useSyncExternalStore } from "react"
 
 export type BrowserStore<T> = {
   get: () => T
+  getServer: () => T
   set: (value: T) => void
   subscribe: (callback: () => void) => () => void
 }
@@ -20,15 +21,28 @@ export function createBrowserStore<T>({
   defaultValue: T
 }): BrowserStore<T> {
   const listeners = new Set<() => void>()
+  let cachedRaw: string | null | undefined
+  let cachedValue = defaultValue
 
   function get(): T {
     if (typeof window === "undefined") return defaultValue
-    return parse(localStorage.getItem(key))
+
+    const raw = localStorage.getItem(key)
+    if (raw === cachedRaw) {
+      return cachedValue
+    }
+
+    cachedRaw = raw
+    cachedValue = parse(raw)
+    return cachedValue
   }
 
   function set(value: T) {
     if (typeof window === "undefined") return
-    localStorage.setItem(key, serialize(value))
+    const raw = serialize(value)
+    localStorage.setItem(key, raw)
+    cachedRaw = raw
+    cachedValue = value
     listeners.forEach((cb) => cb())
   }
 
@@ -47,13 +61,17 @@ export function createBrowserStore<T>({
     }
   }
 
-  return { get, set, subscribe }
+  function getServer(): T {
+    return defaultValue
+  }
+
+  return { get, getServer, set, subscribe }
 }
 
 export function useBrowserStore<T>(store: BrowserStore<T>): T {
   return useSyncExternalStore(
     store.subscribe,
     store.get,
-    () => store.get()
+    store.getServer
   )
 }
