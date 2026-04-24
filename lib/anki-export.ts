@@ -194,7 +194,7 @@ export async function buildTransformedApkg(
         }
 
         const newFlds = joinFields(fields)
-        const csum = computeCsum(fields[0] ?? "")
+        const csum = await computeCsum(fields[0] ?? "")
 
         db.run(
           "UPDATE notes SET flds = ?, mod = ?, csum = ? WHERE id = ?",

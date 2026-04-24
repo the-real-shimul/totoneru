@@ -128,6 +128,6 @@ export async function applyTransformations({
   return { value: current, changed: anyChanged }
 }
 
-function stripHtml(value: string): string {
+export function stripHtml(value: string): string {
   return value.replace(/<[^>]*>/g, "").trim()
 }

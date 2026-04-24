@@ -1,5 +1,6 @@
 import type { FieldRole } from "@/lib/schema-mapping"
 import type { ParsedNote, ParsedNoteType } from "@/lib/apkg-parser-types"
+import { applyFieldNormalize } from "@/lib/transformations"
 
 export type TemplateType = "vocabulary" | "sentence" | "none"
 
@@ -161,7 +162,7 @@ export function applyTemplateTransform({
   const reorderedValues = orderedFieldNames.map((name) => {
     const index = fieldNameToIndex.get(name)
     const raw = index !== undefined ? note.fieldValues[index] ?? "" : ""
-    return normalizeFieldValue(raw)
+    return applyFieldNormalize(raw).value
   })
 
   const newRoleMapping: Record<string, FieldRole> = {}
@@ -177,14 +178,6 @@ export function applyTemplateTransform({
     fieldOrder: orderedFieldNames,
     roleMapping: newRoleMapping,
   }
-}
-
-function normalizeFieldValue(value: string) {
-  return value
-    .replace(/\r\n?/g, "\n")
-    .replace(/[ \t]+/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim()
 }
 
 const templatePreviewStyles = `

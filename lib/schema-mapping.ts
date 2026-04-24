@@ -1,4 +1,5 @@
 import type { ParsedNote, ParsedNoteType } from "@/lib/apkg-parser-types"
+import { stripHtml } from "@/lib/transformations"
 
 export type FieldRole =
   | "expression"
@@ -232,6 +233,4 @@ function mostlyLatin(samples: string[]) {
   return latin > japanese
 }
 
-function stripHtml(value: string) {
-  return value.replace(/<[^>]*>/g, "").trim()
-}
+
