@@ -9,7 +9,7 @@ import {
   createBrowserStore,
   useBrowserStore,
 } from "@/lib/browser-store"
-import { CURATED_PROMPTS, estimateCost, estimateTokens, interpolatePrompt, type UserPrompt } from "@/lib/prompts"
+import { CURATED_PROMPTS, estimateCost, estimateTokens, extractVariables, interpolatePrompt, type UserPrompt } from "@/lib/prompts"
 import { getFieldRoleLabel } from "@/lib/schema-mapping"
 import type { FieldRole } from "@/lib/schema-mapping"
 
@@ -156,6 +156,11 @@ function PromptCard({
             {v.name} → {getFieldRoleLabel(v.role)}
           </span>
         ))}
+        {prompt.outputRole && (
+          <span className="rounded-[6px] bg-[rgba(74,122,78,0.10)] px-2 py-0.5 font-mono text-[11px] text-[#2E5C33]">
+            out → {getFieldRoleLabel(prompt.outputRole)}
+          </span>
+        )}
       </div>
 
       <div className="mt-2 flex items-center gap-3">
@@ -206,6 +211,8 @@ function getSampleVariableValues(
   return values
 }
 
+const OUTPUT_ROLES: FieldRole[] = ["meaning", "sentence", "translation", "reading", "expression", "sentenceReading"]
+
 export function PromptEditor({
   onSave,
 }: {
@@ -215,11 +222,13 @@ export function PromptEditor({
   const descriptionId = useId()
   const systemId = useId()
   const userId = useId()
+  const outputRoleId = useId()
 
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [systemMessage, setSystemMessage] = useState("")
   const [userMessage, setUserMessage] = useState("")
+  const [outputRole, setOutputRole] = useState<FieldRole>("meaning")
   const [isSaving, setIsSaving] = useState(false)
 
   const variables = extractVariables(userMessage + systemMessage)
@@ -236,11 +245,12 @@ export function PromptEditor({
       description: description.trim(),
       systemMessage: systemMessage.trim(),
       userMessage: userMessage.trim(),
-      variables: variables.map((name) => ({
-        name,
+      variables: variables.map((varName) => ({
+        name: varName,
         role: "expression" as FieldRole,
-        description: name,
+        description: varName,
       })),
+      outputRole,
       createdAt: new Date().toISOString(),
     }
 
@@ -253,6 +263,7 @@ export function PromptEditor({
     setDescription("")
     setSystemMessage("")
     setUserMessage("")
+    setOutputRole("meaning")
   }
 
   return (
@@ -318,6 +329,27 @@ export function PromptEditor({
         </p>
       </div>
 
+      <div>
+        <label htmlFor={outputRoleId} className="block text-[13px] font-medium text-foreground mb-1">
+          Write output to field
+        </label>
+        <select
+          id={outputRoleId}
+          value={outputRole}
+          onChange={(e) => setOutputRole(e.target.value as FieldRole)}
+          className="w-full rounded-[8px] border border-border bg-background px-3 py-2 text-[14px] text-foreground outline-none"
+        >
+          {OUTPUT_ROLES.map((role) => (
+            <option key={role} value={role}>
+              {getFieldRoleLabel(role)}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-[12px] text-muted-foreground">
+          The AI response will be written to the field mapped to this role.
+        </p>
+      </div>
+
       <Button type="submit" disabled={isSaving}>
         {isSaving ? <LoaderCircle className="animate-spin" /> : <BookOpen />}
         {isSaving ? "Saving..." : "Save prompt"}
@@ -326,8 +358,3 @@ export function PromptEditor({
   )
 }
 
-function extractVariables(template: string): string[] {
-  const matches = template.match(/\{\{(\w+)\}\}/g)
-  if (!matches) return []
-  return [...new Set(matches.map((m) => m.slice(2, -2)))]
-}

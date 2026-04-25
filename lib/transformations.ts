@@ -66,6 +66,12 @@ export async function applyFurigana(value: string): Promise<TransformResult> {
 
 export function applyHtmlClean(value: string): TransformResult {
   const cleaned = value
+    // Strip script and style blocks including their content
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "")
+    // Strip dangerous structural/interactive tags (open and close)
+    .replace(/<\/?(iframe|frame|frameset|form|input|button|select|textarea|object|embed|applet|meta|link|base)[^>]*>/gi, "")
+    // Strip formatting-only tags
     .replace(/<\/?(font|span|div|p)[^>]*>/gi, "")
     .replace(/style="[^"]*"/gi, "")
     .replace(/class="[^"]*"/gi, "")

@@ -252,15 +252,38 @@ function BlockSettingsPanel({
         <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1">
           Style
         </p>
-        <label className="flex items-center gap-2 text-[14px] text-foreground cursor-pointer">
-          <input
-            type="checkbox"
-            checked={!!block.style.emphasis}
-            onChange={(e) => onUpdateStyle(block.role, { emphasis: e.target.checked })}
-            className="size-4 accent-foreground"
-          />
-          Bold
-        </label>
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 text-[14px] text-foreground cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!block.style.emphasis}
+              onChange={(e) => onUpdateStyle(block.role, { emphasis: e.target.checked })}
+              className="size-4 accent-foreground"
+            />
+            Bold
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={block.style.color ?? "#1A1A1A"}
+              onChange={(e) => onUpdateStyle(block.role, { color: e.target.value })}
+              className="size-7 rounded cursor-pointer border border-border bg-background p-0.5"
+              title="Text color"
+            />
+            <span className="text-[13px] text-foreground">
+              {block.style.color ?? "Default"}
+            </span>
+            {block.style.color && (
+              <button
+                type="button"
+                onClick={() => onUpdateStyle(block.role, { color: undefined })}
+                className="text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       <div>

@@ -103,7 +103,7 @@ function AddKeyForm({
   function handleProviderChange(newProvider: AiProvider) {
     setProvider(newProvider)
     setEndpoint(DEFAULT_ENDPOINTS[newProvider])
-    setModel(newProvider === "anthropic" ? "claude-3-sonnet-20240229" : "gpt-4o-mini")
+    setModel(newProvider === "anthropic" ? "claude-sonnet-4-5" : "gpt-4o-mini")
   }
 
   async function handleSubmit(event: React.FormEvent) {
