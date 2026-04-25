@@ -139,6 +139,11 @@ export function generateBlockStyles(layout: LayoutConfig): string {
       lines.push(`.block-${block.role} { display: none; }`)
       lines.push(`.card-back .block-${block.role} { display: block; }`)
     }
+
+    if (block.behavior.revealMode === "hover") {
+      lines.push(`.block-${block.role} { opacity: 0; transition: opacity 0.15s ease; cursor: pointer; }`)
+      lines.push(`.block-${block.role}:hover { opacity: 1; }`)
+    }
   }
 
   return lines.join("\n")
@@ -208,6 +213,10 @@ export function generateCardHtmlFromBlocks({
 
       if (block.behavior.revealMode === "delay" && face === "front") {
         return `<div class="block-${block.role}" style="opacity:0;transition:opacity 0.3s ease">${esc(value)}</div>`
+      }
+
+      if (block.behavior.revealMode === "hover") {
+        return `<div class="block-${block.role}" style="opacity:0;transition:opacity 0.15s ease;cursor:pointer" title="Hover to reveal">${esc(value)}</div>`
       }
 
       return `<div class="block-${block.role}">${esc(value)}</div>`

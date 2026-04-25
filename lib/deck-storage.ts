@@ -74,6 +74,21 @@ export async function loadBackupData(backupId: string): Promise<ArrayBuffer | un
   return record?.data
 }
 
+export async function deleteBackup(backupId: string): Promise<void> {
+  const database = await getDatabase()
+  await database.delete(BACKUP_STORE, backupId)
+}
+
+export async function deleteAllStaleDeckRecords(keepId: string): Promise<void> {
+  const database = await getDatabase()
+  const allDecks = await database.getAll(DECK_STORE)
+  for (const deck of allDecks) {
+    if (deck.id !== keepId) {
+      await database.delete(DECK_STORE, deck.id)
+    }
+  }
+}
+
 export async function saveActiveDeck(deck: ActiveDeck): Promise<void> {
   const database = await getDatabase()
   await database.put(DECK_STORE, deck)

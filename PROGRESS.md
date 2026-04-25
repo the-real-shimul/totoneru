@@ -6,7 +6,7 @@
 
 ## Current Status
 
-**Phase:** 10 — Public Launch  
+**Phase:** 10 — Public Launch (post-launch audit fixes)  
 **Next session target:** Execute launch posts, monitor Sentry, enable GitHub Discussions  
 **Last updated:** 2026-04-26
 
@@ -433,6 +433,41 @@
 - Enable GitHub Discussions
 - Post to r/Anki and r/LearnJapanese
 - Monitor Sentry for first 48 hours
+
+### 2026-04-25 — Post-launch audit: P0 + P1 fixes
+
+**Done:**
+
+**P0 — Critical**
+- Fixed `applyHtmlClean` in `lib/transformations.ts`: now strips `<script>`/`<style>` blocks (including content), and dangerous tags (`iframe`, `form`, `input`, `button`, `select`, `textarea`, `object`, `embed`, `meta`, `link`) before writing back to the Anki SQLite
+- Fixed "Apply to all" to process the full deck: added `loadAllNotes` message type to `workers/apkg-parser.worker.ts`; `batch-runner.tsx` now loads all notes from the IndexedDB backup before the full batch instead of capping at the 50-card sample. AI transforms now reach the entire deck. Built-in transforms (furigana, HTML clean, field normalize) already operated on all notes at export time.
+- Button label updated from "Apply to all" → "Apply to all (N notes)" showing the true deck size
+
+**P1 — High**
+- Fixed backup storage leak: added `deleteBackup` and `deleteAllStaleDeckRecords` to `lib/deck-storage.ts`; `handleClearWorkspace` now deletes the backup blob alongside the deck record; new imports also clean up stale deck records
+- Added hard spend cap: `spendCapUsd` field added to `BatchConfig`; `runBatch` accumulates estimated cost per card and aborts early with `abortReason: "spendCap"` if exceeded; `BatchRunner` shows a numeric input (shown only when a prompt is selected) and a prominent warning banner when the cap fires
+- Fixed AI output field targeting: `outputRole: FieldRole` added to `UserPrompt` type; `applyAiPromptToNote` now writes to the field mapped to `prompt.outputRole` instead of hardcoded `"meaning"`; curated prompts each have correct output roles (`sentence`, `meaning`, `translation`); `PromptEditor` now shows a "Write output to field" selector; prompt cards show the output role as a green badge
+- Fixed hover reveal mode in block editor: `generateBlockStyles` now emits real `:hover` CSS (`opacity: 0 → 1` with `cursor: pointer` and transition); `generateCardHtmlFromBlocks` renders hover blocks with `title="Hover to reveal"` and inline opacity-0 style; mode is no longer a silent no-op
+
+**Verification:** `tsc --noEmit` passes (no errors beyond pre-existing `baseUrl` deprecation warning); `eslint --max-warnings 0` passes clean; `npm run build` succeeds.
+
+### 2026-04-25 — Post-launch audit: P2 + P3 fixes
+
+**Done:**
+
+**P2 — High**
+- Eliminated CDN dependency for kuromoji: added `scripts/copy-kuromoji-assets.mjs` and `postinstall` script in `package.json`; `kuromoji.js` and all dict files are now copied from `node_modules` to `public/` on `npm install`. Worker paths updated to `new URL("/kuromoji.js", self.location.origin)` and `/dict`. Files added to `.gitignore` (generated, not committed). ESLint ignores updated to skip vendor files in `public/`.
+- Added color picker to block editor settings panel (`components/block-editor.tsx`): `BlockSettingsPanel` now renders a native `<input type="color">` with a color swatch, current hex value, and reset-to-default button. Completes C.9 MVP spec item (font size + color + emphasis).
+- Dry-run is now mandatory before any "Apply to all" — not just when an AI prompt is selected. Removed `&& selectedPrompt` condition from the gate. Confirms dry-run button also shows for built-in-transform-only batches.
+
+**P3 — Polish**
+- Added `loading` state to `ProbeState`; app now renders "Restoring workspace…" spinner while `loadMostRecentActiveDeck` resolves on mount — eliminates the idle flash for users with a saved deck.
+- "Clear workspace" now shows a `window.confirm()` dialog with a clear description of what will be lost before deleting any data.
+- Updated default Anthropic model from `claude-3-sonnet-20240229` (2 generations stale) to `claude-sonnet-4-5`.
+- Updated `estimateCost` in `lib/prompts.ts` to cover current model families: gpt-4o, gpt-4o-mini, claude-opus-4, claude-sonnet-4, claude-haiku-4, claude-3-5-sonnet, claude-3-5-haiku, Groq/Llama/Mixtral.
+- Removed duplicate `extractVariables` function from `components/prompt-library.tsx`; now imports from `lib/prompts.ts`.
+
+**Verification:** `tsc --noEmit` clean; `eslint --max-warnings 0` clean; `npm run build` succeeds.
 
 ---
 

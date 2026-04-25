@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendor files copied from node_modules — not our code
+    "public/kuromoji.js",
+    "public/dict/**",
+    "scripts/**",
   ]),
 ]);
 
