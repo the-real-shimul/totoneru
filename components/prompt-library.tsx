@@ -170,6 +170,7 @@ export function PromptEditor({
   const [description, setDescription] = useState("")
   const [systemMessage, setSystemMessage] = useState("")
   const [userMessage, setUserMessage] = useState("")
+  const [outputRole, setOutputRole] = useState<FieldRole>("meaning")
   const [isSaving, setIsSaving] = useState(false)
 
   const variables = extractVariables(userMessage + systemMessage)
@@ -191,6 +192,7 @@ export function PromptEditor({
         role: "expression" as FieldRole,
         description: name,
       })),
+      outputRole,
       createdAt: new Date().toISOString(),
     }
 
@@ -203,6 +205,7 @@ export function PromptEditor({
     setDescription("")
     setSystemMessage("")
     setUserMessage("")
+    setOutputRole("meaning")
   }
 
   return (
@@ -248,6 +251,23 @@ export function PromptEditor({
           placeholder="You are a helpful Japanese language assistant..."
           className="w-full border-2 border-black bg-white px-3 py-2 text-[14px] text-[#1a1a1a] outline-none resize-none"
         />
+      </div>
+
+      <div>
+        <label className="block text-[13px] font-medium text-[#1a1a1a] mb-1">
+          Output field
+        </label>
+        <select
+          value={outputRole}
+          onChange={(e) => setOutputRole(e.target.value as FieldRole)}
+          className="w-full border-2 border-black bg-white px-3 py-2 text-[14px] text-[#1a1a1a] outline-none"
+        >
+          {["expression", "reading", "meaning", "sentence", "sentenceReading", "translation", "audio", "unknown"].map((role) => (
+            <option key={role} value={role}>
+              {getFieldRoleLabel(role as FieldRole)}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div>
