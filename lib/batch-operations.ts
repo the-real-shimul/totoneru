@@ -7,7 +7,7 @@ import type { TransformationConfig } from "@/lib/transformations"
 import { sendAiRequest } from "@/lib/ai-client"
 import { getActiveApiKey } from "@/lib/ai-keys"
 import type { AiMessage } from "@/lib/ai-types"
-import { interpolatePrompt, sanitizeAiOutput } from "@/lib/prompts"
+import { interpolatePrompt, sanitizeAiOutput, estimateTokens, estimateCost } from "@/lib/prompts"
 import type { UserPrompt } from "@/lib/prompts"
 
 export type BatchConfig = {
@@ -16,6 +16,7 @@ export type BatchConfig = {
   prompt: UserPrompt | null
   fieldMappingsByNoteType: Record<string, Record<string, FieldRole>>
   templateSelectionsByNoteType: Record<string, TemplateType>
+  spendCapUsd?: number
 }
 
 export type CardResult = {
@@ -36,6 +37,7 @@ export type BatchResult = {
   failedCount: number
   cardResults: CardResult[]
   completedAt: string | null
+  abortReason?: "spendCap" | "aborted"
 }
 
 export type BatchProgress = {
@@ -136,11 +138,17 @@ async function applyAiPromptToNote({
   const sanitized = sanitizeAiOutput(response)
 
   const outputFieldIndex = noteType.fieldNames.findIndex(
-    (name) => fieldMappings[name] === "meaning"
+    (name) => fieldMappings[name] === prompt.outputRole
   )
 
   if (outputFieldIndex >= 0) {
     return { [noteType.fieldNames[outputFieldIndex]]: sanitized }
+  }
+
+  // Fallback: if no field maps to the target role, write to the first mapped field
+  const fallbackIndex = noteType.fieldNames.findIndex((name) => name in fieldMappings)
+  if (fallbackIndex >= 0) {
+    return { [noteType.fieldNames[fallbackIndex]]: sanitized }
   }
 
   return {}
@@ -240,6 +248,8 @@ export async function runBatch({
   const cardResults: CardResult[] = []
   let successCount = 0
   let failedCount = 0
+  let cumulativeCostUsd = 0
+  let spendCapHit = false
 
   for (let i = 0; i < notes.length; i++) {
     if (signal?.aborted) {
@@ -271,6 +281,17 @@ export async function runBatch({
     const fieldMappings = config.fieldMappingsByNoteType[noteType.id] ?? {}
     const templateType = config.templateSelectionsByNoteType[noteType.id] ?? "none"
 
+    // Estimate cost before AI call and abort if cap would be exceeded
+    if (config.prompt && config.spendCapUsd !== undefined) {
+      const promptText = note.fieldValues.join(" ")
+      const tokens = estimateTokens(promptText)
+      const cardCost = estimateCost(tokens, "gpt-4o-mini")
+      if (cumulativeCostUsd + cardCost > config.spendCapUsd) {
+        spendCapHit = true
+        break
+      }
+    }
+
     const result = await processCard({
       note,
       noteType,
@@ -279,6 +300,12 @@ export async function runBatch({
       transformationConfigs: config.transformationConfigs,
       prompt: config.prompt,
     })
+
+    if (config.prompt && result.status === "success") {
+      const tokens = estimateTokens(note.fieldValues.join(" "))
+      const cardCost = estimateCost(tokens, "gpt-4o-mini")
+      cumulativeCostUsd += cardCost
+    }
 
     cardResults.push(result)
     if (result.status === "success") {
@@ -295,7 +322,8 @@ export async function runBatch({
     successCount,
     failedCount,
     cardResults,
-    completedAt: signal?.aborted ? null : new Date().toISOString(),
+    completedAt: spendCapHit || signal?.aborted ? null : new Date().toISOString(),
+    abortReason: spendCapHit ? "spendCap" : signal?.aborted ? "aborted" : undefined,
   }
 }
 

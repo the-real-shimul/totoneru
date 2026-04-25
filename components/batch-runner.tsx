@@ -1,7 +1,7 @@
 "use client"
 
-import { CheckCircle, LoaderCircle, Play, RotateCcw, Square, XCircle } from "lucide-react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { AlertTriangle, CheckCircle, LoaderCircle, Play, RotateCcw, Square, XCircle } from "lucide-react"
+import { useCallback, useEffect, useId, useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import type { ActiveDeck } from "@/lib/deck-model"
@@ -18,7 +18,8 @@ import {
   saveBatchResult,
   saveStagedChanges,
 } from "@/lib/batch-storage"
-import type { ParsedNoteType } from "@/lib/apkg-parser-types"
+import { loadBackupData } from "@/lib/deck-storage"
+import type { ParsedNote, ParsedNoteType, LoadAllNotesRequest, LoadAllNotesResponse } from "@/lib/apkg-parser-types"
 import type { UserPrompt } from "@/lib/prompts"
 import type { TemplateType } from "@/lib/templates"
 import type { FieldRole } from "@/lib/schema-mapping"
@@ -33,6 +34,29 @@ type BatchRunnerProps = {
   onBatchResultChange?: (result: BatchResult | null) => void
 }
 
+function loadAllNotesFromBackup(buffer: ArrayBuffer): Promise<{ notes: ParsedNote[]; noteTypes: ParsedNoteType[] }> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(
+      new URL("../workers/apkg-parser.worker.ts", import.meta.url),
+      { type: "module" }
+    )
+    worker.onmessage = (event: MessageEvent<LoadAllNotesResponse>) => {
+      worker.terminate()
+      if (event.data.type === "allNotes") {
+        resolve({ notes: event.data.notes, noteTypes: event.data.noteTypes })
+      } else {
+        reject(new Error(event.data.message))
+      }
+    }
+    worker.onerror = (err) => {
+      worker.terminate()
+      reject(new Error(err.message))
+    }
+    const req: LoadAllNotesRequest = { type: "loadAllNotes", buffer }
+    worker.postMessage(req, [req.buffer])
+  })
+}
+
 export function BatchRunner({
   activeDeck,
   transformationConfigs,
@@ -41,12 +65,15 @@ export function BatchRunner({
   getTemplateSelection,
   onBatchResultChange,
 }: BatchRunnerProps) {
+  const spendCapId = useId()
   const [batchResult, setBatchResult] = useState<BatchResult | null>(null)
   const [isRunning, setIsRunning] = useState(false)
   const [isDryRun, setIsDryRun] = useState(false)
   const [dryRunConfirmed, setDryRunConfirmed] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0 })
   const [hasStaged, setHasStaged] = useState(false)
+  const [loadingNotes, setLoadingNotes] = useState(false)
+  const [spendCapInput, setSpendCapInput] = useState("")
   const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -68,7 +95,7 @@ export function BatchRunner({
     })
   }, [activeDeck.id, onBatchResultChange])
 
-  const buildConfig = useCallback((): BatchConfig => {
+  const buildConfig = useCallback((spendCapUsd?: number): BatchConfig => {
     const fieldMappingsByNoteType: Record<string, Record<string, FieldRole>> = {}
     const templateSelectionsByNoteType: Record<string, TemplateType> = {}
 
@@ -83,6 +110,7 @@ export function BatchRunner({
       prompt: selectedPrompt,
       fieldMappingsByNoteType,
       templateSelectionsByNoteType,
+      spendCapUsd,
     }
   }, [activeDeck, transformationConfigs, selectedPrompt, getFieldMappings, getTemplateSelection])
 
@@ -111,14 +139,35 @@ export function BatchRunner({
 
     setIsDryRun(false)
     setIsRunning(true)
-    setProgress({ current: 0, total: activeDeck.deck.sampleNotes.length })
+
+    const spendCapUsd = spendCapInput.trim() ? parseFloat(spendCapInput) : undefined
+
+    // Load all notes from the backup so we process the full deck, not just the 50-card sample
+    let allNotes: ParsedNote[] = activeDeck.deck.sampleNotes
+    let allNoteTypes: ParsedNoteType[] = activeDeck.deck.noteTypes
+
+    try {
+      setLoadingNotes(true)
+      const buffer = await loadBackupData(activeDeck.backupId)
+      if (buffer) {
+        const loaded = await loadAllNotesFromBackup(buffer)
+        allNotes = loaded.notes
+        allNoteTypes = loaded.noteTypes
+      }
+    } catch {
+      // If loading the full deck fails, fall back to the sample notes
+    } finally {
+      setLoadingNotes(false)
+    }
+
+    setProgress({ current: 0, total: allNotes.length })
 
     abortRef.current = new AbortController()
 
-    const config = buildConfig()
+    const config = buildConfig(spendCapUsd)
     const result = await runBatch({
-      notes: activeDeck.deck.sampleNotes,
-      noteTypes: activeDeck.deck.noteTypes,
+      notes: allNotes,
+      noteTypes: allNoteTypes,
       config,
       onProgress: (p) => setProgress({ current: p.current, total: p.total }),
       signal: abortRef.current.signal,
@@ -203,6 +252,24 @@ export function BatchRunner({
 
   return (
     <div className="space-y-4">
+      {selectedPrompt && (
+        <div className="flex items-center gap-3">
+          <label htmlFor={spendCapId} className="shrink-0 text-[13px] text-muted-foreground">
+            Spend cap (USD)
+          </label>
+          <input
+            id={spendCapId}
+            type="number"
+            min="0"
+            step="0.01"
+            value={spendCapInput}
+            onChange={(e) => setSpendCapInput(e.target.value)}
+            placeholder="No limit"
+            className="w-28 rounded-[8px] border border-border bg-background px-3 py-1.5 text-[13px] text-foreground outline-none"
+          />
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-3">
         <Button
           type="button"
@@ -243,7 +310,7 @@ export function BatchRunner({
           ) : (
             <Play />
           )}
-          Apply to all
+          Apply to all ({activeDeck.deck.noteCount} notes)
         </Button>
 
         {isRunning && !isDryRun && (
@@ -284,27 +351,40 @@ export function BatchRunner({
         <div className="rounded-[12px] border border-border bg-background/60 p-4">
           <div className="flex items-center justify-between gap-3 mb-2">
             <p className="text-[14px] font-medium text-foreground" id="batch-progress-label">
-              Processing cards...
+              {loadingNotes ? "Loading deck…" : "Processing cards…"}
             </p>
-            <span className="font-mono text-[12px] text-muted-foreground" aria-hidden="true">
-              {progress.current}/{progress.total}
-            </span>
+            {!loadingNotes && (
+              <span className="font-mono text-[12px] text-muted-foreground" aria-hidden="true">
+                {progress.current}/{progress.total}
+              </span>
+            )}
           </div>
-          <div
-            className="h-2 rounded-full bg-muted overflow-hidden"
-            role="progressbar"
-            aria-labelledby="batch-progress-label"
-            aria-valuenow={progress.current}
-            aria-valuemin={0}
-            aria-valuemax={progress.total}
-          >
+          {!loadingNotes && (
             <div
-              className="h-full rounded-full bg-[#4A7A4E] transition-all duration-300"
-              style={{
-                width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%`,
-              }}
-            />
-          </div>
+              className="h-2 rounded-full bg-muted overflow-hidden"
+              role="progressbar"
+              aria-labelledby="batch-progress-label"
+              aria-valuenow={progress.current}
+              aria-valuemin={0}
+              aria-valuemax={progress.total}
+            >
+              <div
+                className="h-full rounded-full bg-[#4A7A4E] transition-all duration-300"
+                style={{
+                  width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%`,
+                }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {batchResult?.abortReason === "spendCap" && (
+        <div className="flex items-center gap-2 rounded-[8px] border border-[rgba(184,135,58,0.30)] bg-[rgba(184,135,58,0.08)] px-3 py-2">
+          <AlertTriangle className="size-4 shrink-0 text-[#8A6528]" />
+          <p className="text-[13px] text-[#8A6528]">
+            Batch stopped — spend cap reached. Results below are for cards processed so far.
+          </p>
         </div>
       )}
 

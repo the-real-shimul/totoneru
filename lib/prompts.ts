@@ -1,4 +1,5 @@
 import type { FieldRole } from "@/lib/schema-mapping"
+export type { FieldRole }
 
 export type PromptVariable = {
   name: string
@@ -13,6 +14,7 @@ export type UserPrompt = {
   systemMessage: string
   userMessage: string
   variables: PromptVariable[]
+  outputRole: FieldRole
   createdAt: string
 }
 
@@ -31,6 +33,7 @@ export const CURATED_PROMPTS: UserPrompt[] = [
         description: "The Japanese word or expression",
       },
     ],
+    outputRole: "sentence",
     createdAt: "2026-04-25",
   },
   {
@@ -57,6 +60,7 @@ export const CURATED_PROMPTS: UserPrompt[] = [
         description: "The current English meaning",
       },
     ],
+    outputRole: "meaning",
     createdAt: "2026-04-25",
   },
   {
@@ -78,6 +82,7 @@ export const CURATED_PROMPTS: UserPrompt[] = [
         description: "The current English translation",
       },
     ],
+    outputRole: "translation",
     createdAt: "2026-04-25",
   },
   {
@@ -104,6 +109,7 @@ export const CURATED_PROMPTS: UserPrompt[] = [
         description: "The English meaning",
       },
     ],
+    outputRole: "meaning",
     createdAt: "2026-04-25",
   },
 ]

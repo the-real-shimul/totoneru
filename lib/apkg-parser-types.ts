@@ -51,10 +51,26 @@ export type ApkgParserRequest = {
   buffer: ArrayBuffer
 }
 
+export type LoadAllNotesRequest = {
+  type: "loadAllNotes"
+  buffer: ArrayBuffer
+}
+
 export type ApkgParserResponse =
   | {
       type: "success"
       deck: ParsedDeckSummary
+    }
+  | {
+      type: "error"
+      message: string
+    }
+
+export type LoadAllNotesResponse =
+  | {
+      type: "allNotes"
+      notes: ParsedNote[]
+      noteTypes: ParsedNoteType[]
     }
   | {
       type: "error"

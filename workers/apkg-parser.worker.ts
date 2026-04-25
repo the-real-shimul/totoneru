@@ -5,6 +5,8 @@ import initSqlJs from "sql.js/dist/sql-wasm.js"
 import type {
   ApkgParserRequest,
   ApkgParserResponse,
+  LoadAllNotesRequest,
+  LoadAllNotesResponse,
   ParsedCardTemplate,
   ParsedDeckSummary,
   ParsedMediaItem,
@@ -322,11 +324,64 @@ async function parseDeck(request: ApkgParserRequest): Promise<ParsedDeckSummary>
   }
 }
 
-self.onmessage = async (event: MessageEvent<ApkgParserRequest>) => {
+async function loadAllNotes(request: LoadAllNotesRequest): Promise<{ notes: ParsedNote[]; noteTypes: ParsedNoteType[] }> {
+  const zip = await JSZip.loadAsync(request.buffer)
+  const entryNames = Object.keys(zip.files)
+  const collectionFileName = findSupportedCollectionFile(entryNames)
+  const rawCollectionBytes = await zip.file(collectionFileName)?.async("uint8array")
+
+  if (!rawCollectionBytes) {
+    throw new Error("Unable to read collection.anki21b from the archive.")
+  }
+
+  const collectionBytes = await decompressIfNeeded(rawCollectionBytes)
+  const SQL = await getSql()
+  const database = new SQL.Database(collectionBytes)
+
+  try {
+    const noteTypes = parseDatabaseNoteTypes(database)
+    const noteRows = database.exec(
+      "select id, guid, mid, flds, tags from notes order by id"
+    )
+
+    const notes: ParsedNote[] = ((noteRows[0]?.values ?? []) as NoteRow[]).map(
+      ([id, guid, noteTypeId, rawFields, rawTags]) => ({
+        id: String(id),
+        guid,
+        noteTypeId: String(noteTypeId),
+        fieldValues: parseNoteFields(rawFields),
+        tags: parseTags(rawTags),
+      })
+    )
+
+    return { notes, noteTypes }
+  } finally {
+    database.close()
+  }
+}
+
+self.onmessage = async (event: MessageEvent<ApkgParserRequest | LoadAllNotesRequest>) => {
+  const request = event.data
+
+  if (request.type === "loadAllNotes") {
+    try {
+      const { notes, noteTypes } = await loadAllNotes(request)
+      const response: LoadAllNotesResponse = { type: "allNotes", notes, noteTypes }
+      self.postMessage(response)
+    } catch (error) {
+      const response: LoadAllNotesResponse = {
+        type: "error",
+        message: error instanceof Error ? error.message : "Failed to load notes.",
+      }
+      self.postMessage(response)
+    }
+    return
+  }
+
   try {
     const response: ApkgParserResponse = {
       type: "success",
-      deck: await parseDeck(event.data),
+      deck: await parseDeck(request),
     }
 
     self.postMessage(response)

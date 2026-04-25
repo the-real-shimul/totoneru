@@ -9,7 +9,7 @@ import {
   getFirstRenderableTemplate,
   renderAnkiTemplate,
 } from "@/lib/anki-template-renderer"
-import { saveOriginalDeckBackup, saveActiveDeck, loadMostRecentActiveDeck, deleteActiveDeck } from "@/lib/deck-storage"
+import { saveOriginalDeckBackup, saveActiveDeck, loadMostRecentActiveDeck, deleteActiveDeck, deleteBackup, deleteAllStaleDeckRecords } from "@/lib/deck-storage"
 import type {
   ApkgParserRequest,
   ApkgParserResponse,
@@ -134,7 +134,8 @@ export function ApkgImportProbe() {
 
   function handleClearWorkspace() {
     if (result.status === "success") {
-      deleteActiveDeck(result.activeDeck.id).then(() => {
+      const { id, backupId } = result.activeDeck
+      Promise.all([deleteActiveDeck(id), deleteBackup(backupId)]).then(() => {
         setResult({ status: "idle" })
       })
     }
@@ -156,6 +157,7 @@ export function ApkgImportProbe() {
           fileSize: backup.fileSize,
         })
         await saveActiveDeck(activeDeck)
+        await deleteAllStaleDeckRecords(activeDeck.id)
         setResult({ status: "success", activeDeck })
       } catch (error) {
         const message =
