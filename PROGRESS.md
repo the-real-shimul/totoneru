@@ -443,6 +443,24 @@
 
 **Verification:** `tsc --noEmit` passes (no errors beyond pre-existing `baseUrl` deprecation warning); `eslint --max-warnings 0` passes clean; `npm run build` succeeds.
 
+### 2026-04-25 — Post-launch audit: P2 + P3 fixes
+
+**Done:**
+
+**P2 — High**
+- Eliminated CDN dependency for kuromoji: added `scripts/copy-kuromoji-assets.mjs` and `postinstall` script in `package.json`; `kuromoji.js` and all dict files are now copied from `node_modules` to `public/` on `npm install`. Worker paths updated to `new URL("/kuromoji.js", self.location.origin)` and `/dict`. Files added to `.gitignore` (generated, not committed). ESLint ignores updated to skip vendor files in `public/`.
+- Added color picker to block editor settings panel (`components/block-editor.tsx`): `BlockSettingsPanel` now renders a native `<input type="color">` with a color swatch, current hex value, and reset-to-default button. Completes C.9 MVP spec item (font size + color + emphasis).
+- Dry-run is now mandatory before any "Apply to all" — not just when an AI prompt is selected. Removed `&& selectedPrompt` condition from the gate. Confirms dry-run button also shows for built-in-transform-only batches.
+
+**P3 — Polish**
+- Added `loading` state to `ProbeState`; app now renders "Restoring workspace…" spinner while `loadMostRecentActiveDeck` resolves on mount — eliminates the idle flash for users with a saved deck.
+- "Clear workspace" now shows a `window.confirm()` dialog with a clear description of what will be lost before deleting any data.
+- Updated default Anthropic model from `claude-3-sonnet-20240229` (2 generations stale) to `claude-sonnet-4-5`.
+- Updated `estimateCost` in `lib/prompts.ts` to cover current model families: gpt-4o, gpt-4o-mini, claude-opus-4, claude-sonnet-4, claude-haiku-4, claude-3-5-sonnet, claude-3-5-haiku, Groq/Llama/Mixtral.
+- Removed duplicate `extractVariables` function from `components/prompt-library.tsx`; now imports from `lib/prompts.ts`.
+
+**Verification:** `tsc --noEmit` clean; `eslint --max-warnings 0` clean; `npm run build` succeeds.
+
 ---
 
 ## Open Questions

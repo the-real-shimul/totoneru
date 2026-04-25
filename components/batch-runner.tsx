@@ -133,7 +133,7 @@ export function BatchRunner({
   }
 
   async function handleRunBatch() {
-    if (!dryRunConfirmed && selectedPrompt) {
+    if (!dryRunConfirmed) {
       return
     }
 
@@ -247,8 +247,7 @@ export function BatchRunner({
     })
   }
 
-  const canRunBatch =
-    !isRunning && (dryRunConfirmed || !selectedPrompt) && !hasStaged
+  const canRunBatch = !isRunning && dryRunConfirmed && !hasStaged
 
   return (
     <div className="space-y-4">
@@ -285,7 +284,7 @@ export function BatchRunner({
           Dry-run (5 cards)
         </Button>
 
-        {selectedPrompt && !dryRunConfirmed && batchResult && isDryRun && (
+        {!dryRunConfirmed && batchResult && isDryRun && (
           <Button
             type="button"
             onClick={() => setDryRunConfirmed(true)}

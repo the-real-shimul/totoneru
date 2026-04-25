@@ -9,7 +9,7 @@ import {
   createBrowserStore,
   useBrowserStore,
 } from "@/lib/browser-store"
-import { CURATED_PROMPTS, estimateCost, estimateTokens, interpolatePrompt, type UserPrompt } from "@/lib/prompts"
+import { CURATED_PROMPTS, estimateCost, estimateTokens, extractVariables, interpolatePrompt, type UserPrompt } from "@/lib/prompts"
 import { getFieldRoleLabel } from "@/lib/schema-mapping"
 import type { FieldRole } from "@/lib/schema-mapping"
 
@@ -358,8 +358,3 @@ export function PromptEditor({
   )
 }
 
-function extractVariables(template: string): string[] {
-  const matches = template.match(/\{\{(\w+)\}\}/g)
-  if (!matches) return []
-  return [...new Set(matches.map((m) => m.slice(2, -2)))]
-}

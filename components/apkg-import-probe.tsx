@@ -66,6 +66,7 @@ type FieldDiff = {
 }
 
 type ProbeState =
+  | { status: "loading" }
   | { status: "idle" }
   | { status: "success"; activeDeck: ActiveDeck }
   | { status: "error"; message: string }
@@ -117,14 +118,14 @@ function parseApkgInWorker(file: File, buffer: ArrayBuffer) {
 export function ApkgImportProbe() {
   const inputId = useId()
   const inputRef = useRef<HTMLInputElement | null>(null)
-  const [result, setResult] = useState<ProbeState>({ status: "idle" })
+  const [result, setResult] = useState<ProbeState>({ status: "loading" })
   const [isPending, startTransition] = useTransition()
 
   useEffect(() => {
     let cancelled = false
     loadMostRecentActiveDeck().then((activeDeck) => {
-      if (!cancelled && activeDeck) {
-        setResult({ status: "success", activeDeck })
+      if (!cancelled) {
+        setResult(activeDeck ? { status: "success", activeDeck } : { status: "idle" })
       }
     })
     return () => {
@@ -134,6 +135,9 @@ export function ApkgImportProbe() {
 
   function handleClearWorkspace() {
     if (result.status === "success") {
+      if (!window.confirm("Clear workspace? Your field mappings and template selections will be lost. The original deck backup will also be removed.")) {
+        return
+      }
       const { id, backupId } = result.activeDeck
       Promise.all([deleteActiveDeck(id), deleteBackup(backupId)]).then(() => {
         setResult({ status: "idle" })
@@ -183,6 +187,13 @@ export function ApkgImportProbe() {
           className="sr-only"
           onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)}
         />
+
+        {result.status === "loading" && (
+          <div className="flex items-center gap-3 py-6 text-muted-foreground">
+            <LoaderCircle className="animate-spin size-5" />
+            <span className="text-[14px]">Restoring workspace…</span>
+          </div>
+        )}
 
         {result.status === "idle" && (
           <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:justify-between">

@@ -142,12 +142,22 @@ export function estimateTokens(text: string): number {
 }
 
 export function estimateCost(tokens: number, model: string): number {
-  const modelLower = model.toLowerCase()
-  let per1k = 0.0015
-  if (modelLower.includes("gpt-4")) per1k = 0.03
-  if (modelLower.includes("claude-3-opus")) per1k = 0.015
-  if (modelLower.includes("claude-3-sonnet")) per1k = 0.003
-  if (modelLower.includes("claude-3-haiku")) per1k = 0.00025
-  if (modelLower.includes("gpt-3.5")) per1k = 0.0005
+  const m = model.toLowerCase()
+  let per1k = 0.001 // safe default
+  // OpenAI
+  if (m.includes("gpt-4o-mini")) per1k = 0.00015
+  if (m.includes("gpt-4o")) per1k = 0.005
+  if (m.includes("gpt-4")) per1k = 0.03
+  if (m.includes("gpt-3.5")) per1k = 0.0005
+  // Anthropic — claude-opus-4, sonnet-4, haiku-4 family
+  if (m.includes("claude-opus-4") || m.includes("claude-opus-4-")) per1k = 0.015
+  if (m.includes("claude-sonnet-4") || m.includes("claude-3-5-sonnet") || m.includes("claude-3-7-sonnet")) per1k = 0.003
+  if (m.includes("claude-haiku-4") || m.includes("claude-3-5-haiku")) per1k = 0.0008
+  // Older Anthropic
+  if (m.includes("claude-3-opus")) per1k = 0.015
+  if (m.includes("claude-3-sonnet")) per1k = 0.003
+  if (m.includes("claude-3-haiku")) per1k = 0.00025
+  // Groq / cheap models
+  if (m.includes("llama") || m.includes("mixtral") || m.includes("gemma")) per1k = 0.0001
   return (tokens / 1000) * per1k
 }

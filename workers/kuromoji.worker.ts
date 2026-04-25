@@ -1,6 +1,6 @@
 declare function importScripts(...urls: string[]): void
 
-importScripts("https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js")
+importScripts(new URL("/kuromoji.js", self.location.origin).href)
 
 // Note: we use the global `kuromoji` loaded via importScripts.
 // The type below is a minimal facade for what we need.
@@ -37,7 +37,7 @@ let tokenizerPromise: Promise<KuromojiTokenizer> | null = null
 function getTokenizer(): Promise<KuromojiTokenizer> {
   if (!tokenizerPromise) {
     tokenizerPromise = new Promise((resolve, reject) => {
-      kuromoji.builder({ dicPath: "https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict" }).build(
+      kuromoji.builder({ dicPath: new URL("/dict", self.location.origin).href }).build(
         (err, tokenizer) => {
           if (err) {
             reject(err)
