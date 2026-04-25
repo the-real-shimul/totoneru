@@ -1,8 +1,6 @@
 import { ArrowLeft, Database, Eye, KeyRound, Lock, Monitor, ShieldCheck, Workflow } from "lucide-react"
 import Link from "next/link"
 
-import { ThemeToggle } from "@/components/theme-toggle"
-
 export const metadata = {
   title: "How it works — totoneru",
   description: "Learn how totoneru handles your Anki decks entirely in your browser.",
@@ -56,7 +54,7 @@ export default function HowItWorksPage() {
         Skip to content
       </a>
       <header className="border-b border-border bg-background/90">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4 sm:px-6">
+        <div className="mx-auto flex max-w-6xl items-center gap-4 px-5 py-4 sm:px-6">
           <div className="flex items-center gap-3">
             <Link
               href="/"
@@ -66,7 +64,6 @@ export default function HowItWorksPage() {
               <span className="text-[13px]">Back</span>
             </Link>
           </div>
-          <ThemeToggle />
         </div>
       </header>
 

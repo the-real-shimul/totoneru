@@ -42,7 +42,7 @@ export function DocumentationToggle() {
       size="sm"
       aria-pressed={enabled}
       onClick={() => setEnabled(!enabled)}
-      className="rounded-none border-2 border-black bg-white text-black hover:bg-black hover:text-white dark:border-white dark:bg-black dark:text-white dark:hover:bg-white dark:hover:text-black"
+      className="rounded-none border-2 border-black bg-white text-black hover:bg-black hover:text-white"
     >
       {enabled ? <X /> : <BookOpen />}
       {enabled ? "Hide docs" : "Documentation"}
@@ -55,7 +55,7 @@ export function DocumentationPanel({ item }: { item: HelpDocItem }) {
   if (!enabled) return null
 
   return (
-    <aside className="mt-4 border-2 border-black bg-white p-4 text-black dark:border-white dark:bg-black dark:text-white">
+    <aside className="mt-4 border-2 border-black bg-white p-4 text-black">
       <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em]">
         Documentation / {item.id}
       </p>

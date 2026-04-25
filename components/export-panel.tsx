@@ -113,21 +113,21 @@ export function ExportPanel({
       </div>
 
       {lastResult && (
-        <div className="rounded-[12px] border border-border bg-background/60 p-4 space-y-2">
+        <div className=" border-2 border-black bg-white p-4 space-y-2">
           <div className="flex items-center gap-2">
             {lastResult.error ? (
-              <span className="rounded-full bg-[rgba(217,58,38,0.10)] px-2.5 py-1 font-mono text-[11px] font-semibold text-[#A8321A]">
+              <span className=" bg-[rgba(217,58,38,0.10)] px-2.5 py-1 font-mono text-[11px] font-semibold text-[#A8321A]">
                 Failed
               </span>
             ) : lastResult.verified ? (
               <>
                 <ShieldCheck className="size-4 text-[#4A7A4E]" />
-                <span className="rounded-full bg-[rgba(74,122,78,0.12)] px-2.5 py-1 font-mono text-[11px] font-semibold text-[#2E5C33]">
+                <span className=" bg-[rgba(74,122,78,0.12)] px-2.5 py-1 font-mono text-[11px] font-semibold text-[#2E5C33]">
                   Verified
                 </span>
               </>
             ) : (
-              <span className="rounded-full bg-[rgba(184,135,58,0.12)] px-2.5 py-1 font-mono text-[11px] font-semibold text-[#8A6528]">
+              <span className=" bg-[rgba(184,135,58,0.12)] px-2.5 py-1 font-mono text-[11px] font-semibold text-[#8A6528]">
                 Unverified
               </span>
             )}
@@ -137,10 +137,10 @@ export function ExportPanel({
             <p className="text-[13px] text-[#A8321A]">{lastResult.error}</p>
           ) : (
             <div className="flex flex-wrap gap-3">
-              <span className="font-mono text-[12px] text-muted-foreground">
+              <span className="font-mono text-[12px] text-[#757575]">
                 {lastResult.changed} changed
               </span>
-              <span className="font-mono text-[12px] text-muted-foreground">
+              <span className="font-mono text-[12px] text-[#757575]">
                 {lastResult.unchanged} unchanged
               </span>
             </div>

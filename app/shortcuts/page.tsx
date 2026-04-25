@@ -1,19 +1,12 @@
 import { ArrowLeft, Keyboard } from "lucide-react"
 import Link from "next/link"
 
-import { ThemeToggle } from "@/components/theme-toggle"
-
 export const metadata = {
   title: "Keyboard shortcuts — totoneru",
   description: "Keyboard shortcuts for totoneru.",
 }
 
 const shortcuts = [
-  {
-    keys: ["D"],
-    description: "Toggle dark / light mode",
-    context: "Global",
-  },
   {
     keys: ["Tab"],
     description: "Move focus to next interactive element",
@@ -61,7 +54,7 @@ export default function ShortcutsPage() {
         Skip to content
       </a>
       <header className="border-b border-border bg-background/90">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4 sm:px-6">
+        <div className="mx-auto flex max-w-6xl items-center gap-4 px-5 py-4 sm:px-6">
           <div className="flex items-center gap-3">
             <Link
               href="/"
@@ -71,7 +64,6 @@ export default function ShortcutsPage() {
               <span className="text-[13px]">Back</span>
             </Link>
           </div>
-          <ThemeToggle />
         </div>
       </header>
 

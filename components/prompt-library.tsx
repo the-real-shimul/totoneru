@@ -9,7 +9,7 @@ import {
   createBrowserStore,
   useBrowserStore,
 } from "@/lib/browser-store"
-import { CURATED_PROMPTS, estimateCost, estimateTokens, interpolatePrompt, type UserPrompt } from "@/lib/prompts"
+import { CURATED_PROMPTS, type UserPrompt } from "@/lib/prompts"
 import { getFieldRoleLabel } from "@/lib/schema-mapping"
 import type { FieldRole } from "@/lib/schema-mapping"
 
@@ -54,18 +54,18 @@ export function PromptLibrary({
   return (
     <div className="space-y-3">
       <div>
-        <p className="text-[16px] font-medium text-foreground">Prompt library</p>
-        <p className="text-[13px] text-muted-foreground">
-          {allPrompts.length} prompts available · {CURATED_PROMPTS.length} curated
+        <p className="text-[16px] font-medium text-[#1a1a1a]">Prompt library</p>
+        <p className="text-[13px] text-[#757575]">
+          {allPrompts.length} prompts · {CURATED_PROMPTS.length} curated
         </p>
       </div>
 
-      <div className="space-y-2">
-        {allPrompts.map((prompt) => (
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {allPrompts.map((prompt, index) => (
           <PromptCard
             key={prompt.id}
             prompt={prompt}
-            activeDeck={activeDeck}
+            index={index}
             isSelected={selectedPromptId === prompt.id}
             onSelect={() => onSelectPrompt(prompt)}
             onDelete={
@@ -82,23 +82,18 @@ export function PromptLibrary({
 
 function PromptCard({
   prompt,
-  activeDeck,
+  index,
   isSelected,
   onSelect,
   onDelete,
 }: {
   prompt: UserPrompt
-  activeDeck: ActiveDeck
+  index: number
   isSelected: boolean
   onSelect: () => void
   onDelete?: () => void
 }) {
   const isCurated = prompt.id.startsWith("curated-")
-
-  const variableValues = getSampleVariableValues(prompt, activeDeck)
-  const interpolated = interpolatePrompt(prompt.userMessage, variableValues)
-  const tokenEstimate = estimateTokens(interpolated + prompt.systemMessage)
-  const costEstimate = estimateCost(tokenEstimate, "gpt-4o-mini")
 
   function handleCardKeyDown(event: React.KeyboardEvent) {
     if (event.key === "Enter" || event.key === " ") {
@@ -114,24 +109,12 @@ function PromptCard({
       aria-pressed={isSelected}
       onClick={onSelect}
       onKeyDown={handleCardKeyDown}
-      className={`w-full rounded-[12px] border p-4 text-left transition-colors cursor-pointer ${
-        isSelected
-          ? "border-foreground/20 bg-muted"
-          : "border-border bg-background/60 hover:bg-muted/50"
-      }`}
+      className={`group relative min-h-32 border-2 border-black bg-white p-4 text-left transition-transform hover:-translate-y-1 hover:bg-black hover:text-white cursor-pointer ${
+        isSelected ? "bg-[#f5f5f5]" : ""
+      } ${index % 2 === 0 ? "rotate-[-1deg]" : "rotate-[1deg]"}`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="text-[14px] font-medium text-foreground">{prompt.name}</p>
-            {isCurated && (
-              <span className="shrink-0 rounded-full bg-[rgba(74,122,78,0.12)] px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.04em] text-[#2E5C33]">
-                Curated
-              </span>
-            )}
-          </div>
-          <p className="text-[12px] text-muted-foreground mt-0.5">{prompt.description}</p>
-        </div>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[15px] font-bold leading-tight">{prompt.name}</p>
         {onDelete && (
           <button
             type="button"
@@ -139,71 +122,38 @@ function PromptCard({
               e.stopPropagation()
               onDelete()
             }}
-            className="shrink-0 rounded-[6px] p-1.5 text-muted-foreground hover:text-destructive transition-colors"
+            className="shrink-0 p-1 text-[#757575] hover:text-[#A8321A] transition-colors group-hover:text-white/70 group-hover:hover:text-[#ff6b6b]"
             aria-label={`Delete prompt "${prompt.name}"`}
           >
-            <Trash2 className="size-4" />
+            <Trash2 className="size-3.5" />
           </button>
         )}
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {prompt.variables.map((v) => (
-          <span
-            key={v.name}
-            className="rounded-[6px] bg-muted px-2 py-0.5 font-mono text-[11px] text-muted-foreground"
-          >
-            {v.name} → {getFieldRoleLabel(v.role)}
-          </span>
-        ))}
-      </div>
+      {isCurated && (
+        <p className="mt-2 font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-[#2E5C33] group-hover:text-[#4A7A4E]">
+          Curated
+        </p>
+      )}
 
-      <div className="mt-2 flex items-center gap-3">
-        <span className="font-mono text-[11px] text-muted-foreground">
-          ~{tokenEstimate} tokens
-        </span>
-        <span className="font-mono text-[11px] text-muted-foreground">
-          ~${costEstimate.toFixed(4)}
-        </span>
+      {/* Details shown on hover */}
+      <div className="mt-3 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+        <p className="text-[12px] leading-[1.45] text-[#757575] group-hover:text-white/80">
+          {prompt.description}
+        </p>
+        <div className="mt-2 flex flex-wrap gap-1">
+          {prompt.variables.map((v) => (
+            <span
+              key={v.name}
+              className="border border-white/20 px-1.5 py-0.5 font-mono text-[10px] text-white/70"
+            >
+              {v.name}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   )
-}
-
-function getSampleVariableValues(
-  prompt: UserPrompt,
-  activeDeck: ActiveDeck
-): Record<string, string> {
-  const values: Record<string, string> = {}
-  const firstNote = activeDeck.deck.sampleNotes[0]
-  if (!firstNote) return values
-
-  const noteType = activeDeck.deck.noteTypes.find(
-    (nt) => nt.id === firstNote.noteTypeId
-  )
-  if (!noteType) return values
-
-  const mapping = activeDeck.noteTypeMappings.find(
-    (m) => m.noteTypeId === noteType.id
-  )
-  if (!mapping) return values
-
-  const roleToFieldName: Record<string, string> = {}
-  for (const [fieldName, role] of Object.entries(mapping.fieldMappings)) {
-    roleToFieldName[role] = fieldName
-  }
-
-  for (const variable of prompt.variables) {
-    const fieldName = roleToFieldName[variable.role]
-    if (fieldName) {
-      const index = noteType.fieldNames.indexOf(fieldName)
-      if (index >= 0) {
-        values[variable.name] = firstNote.fieldValues[index] ?? ""
-      }
-    }
-  }
-
-  return values
 }
 
 export function PromptEditor({
@@ -258,7 +208,7 @@ export function PromptEditor({
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div>
-        <label htmlFor={nameId} className="block text-[13px] font-medium text-foreground mb-1">
+        <label htmlFor={nameId} className="block text-[13px] font-medium text-[#1a1a1a] mb-1">
           Name
         </label>
         <input
@@ -268,12 +218,12 @@ export function PromptEditor({
           onChange={(e) => setName(e.target.value)}
           required
           placeholder="My custom prompt"
-          className="w-full rounded-[8px] border border-border bg-background px-3 py-2 text-[14px] text-foreground outline-none"
+          className="w-full border-2 border-black bg-white px-3 py-2 text-[14px] text-[#1a1a1a] outline-none"
         />
       </div>
 
       <div>
-        <label htmlFor={descriptionId} className="block text-[13px] font-medium text-foreground mb-1">
+        <label htmlFor={descriptionId} className="block text-[13px] font-medium text-[#1a1a1a] mb-1">
           Description
         </label>
         <input
@@ -282,12 +232,12 @@ export function PromptEditor({
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="What this prompt does"
-          className="w-full rounded-[8px] border border-border bg-background px-3 py-2 text-[14px] text-foreground outline-none"
+          className="w-full border-2 border-black bg-white px-3 py-2 text-[14px] text-[#1a1a1a] outline-none"
         />
       </div>
 
       <div>
-        <label htmlFor={systemId} className="block text-[13px] font-medium text-foreground mb-1">
+        <label htmlFor={systemId} className="block text-[13px] font-medium text-[#1a1a1a] mb-1">
           System message (optional)
         </label>
         <textarea
@@ -296,12 +246,12 @@ export function PromptEditor({
           onChange={(e) => setSystemMessage(e.target.value)}
           rows={3}
           placeholder="You are a helpful Japanese language assistant..."
-          className="w-full rounded-[8px] border border-border bg-background px-3 py-2 text-[14px] text-foreground outline-none resize-none"
+          className="w-full border-2 border-black bg-white px-3 py-2 text-[14px] text-[#1a1a1a] outline-none resize-none"
         />
       </div>
 
       <div>
-        <label htmlFor={userId} className="block text-[13px] font-medium text-foreground mb-1">
+        <label htmlFor={userId} className="block text-[13px] font-medium text-[#1a1a1a] mb-1">
           User message
         </label>
         <textarea
@@ -311,9 +261,9 @@ export function PromptEditor({
           rows={4}
           required
           placeholder="Generate an example sentence for: {{expression}}"
-          className="w-full rounded-[8px] border border-border bg-background px-3 py-2 text-[14px] text-foreground outline-none resize-none"
+          className="w-full border-2 border-black bg-white px-3 py-2 text-[14px] text-[#1a1a1a] outline-none resize-none"
         />
-        <p className="mt-1 text-[12px] text-muted-foreground">
+        <p className="mt-1 text-[12px] text-[#757575]">
           Use {"{{variableName}}"} for placeholders. Detected: {variables.length > 0 ? variables.join(", ") : "none"}
         </p>
       </div>

@@ -4,8 +4,6 @@ import { Eye, EyeOff, KeyRound, LoaderCircle, Plus, Trash2 } from "lucide-react"
 import { useEffect, useId, useState } from "react"
 
 import { Button } from "@/components/ui/button"
-import { AI_PROVIDERS } from "@/lib/ai-types"
-import type { AiProvider } from "@/lib/ai-types"
 import {
   deleteApiKey,
   loadApiKeys,
@@ -13,10 +11,8 @@ import {
   type StoredKey,
 } from "@/lib/ai-keys"
 
-const DEFAULT_ENDPOINTS: Record<AiProvider, string> = {
-  openai: "https://api.openai.com/v1/chat/completions",
-  anthropic: "https://api.anthropic.com/v1/messages",
-}
+const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions"
+const GROQ_MODEL = "llama-3.1-8b-instant"
 
 export function AiSettings() {
   const [keys, setKeys] = useState<StoredKey[]>([])
@@ -30,9 +26,9 @@ export function AiSettings() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[16px] font-medium text-foreground">AI API keys</p>
-          <p className="text-[13px] text-muted-foreground">
-            Keys are stored locally in your browser. Never sent to our servers.
+          <p className="text-[16px] font-medium text-[#1a1a1a]">Groq API key</p>
+          <p className="text-[13px] text-[#757575]">
+            Stored locally. Never sent to our servers.
           </p>
         </div>
         <Button
@@ -42,7 +38,7 @@ export function AiSettings() {
           onClick={() => setShowForm((s) => !s)}
         >
           {showForm ? "Cancel" : <Plus />}
-          {showForm ? "Cancel" : "Add key"}
+          {showForm ? "Cancel" : keys.length === 0 ? "Add key" : "Replace"}
         </Button>
       </div>
 
@@ -57,8 +53,8 @@ export function AiSettings() {
       )}
 
       {keys.length === 0 ? (
-        <p className="text-[14px] text-muted-foreground">
-          No API keys saved. Add one to enable AI transformations.
+        <p className="text-[14px] text-[#757575]">
+          No key saved. Add your Groq API key to enable AI features.
         </p>
       ) : (
         <div className="space-y-2">
@@ -86,38 +82,26 @@ function AddKeyForm({
   onSaved: (key: StoredKey) => void
   onCancel: () => void
 }) {
-  const providerId = useId()
-  const endpointId = useId()
   const apiKeyId = useId()
-  const modelId = useId()
   const labelId = useId()
 
-  const [provider, setProvider] = useState<AiProvider>("openai")
-  const [endpoint, setEndpoint] = useState(DEFAULT_ENDPOINTS.openai)
   const [apiKey, setApiKey] = useState("")
-  const [model, setModel] = useState("gpt-4o-mini")
   const [label, setLabel] = useState("")
   const [showKey, setShowKey] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
-  function handleProviderChange(newProvider: AiProvider) {
-    setProvider(newProvider)
-    setEndpoint(DEFAULT_ENDPOINTS[newProvider])
-    setModel(newProvider === "anthropic" ? "claude-3-sonnet-20240229" : "gpt-4o-mini")
-  }
-
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
-    if (!apiKey.trim() || !endpoint.trim() || !model.trim()) return
+    if (!apiKey.trim()) return
 
     setIsSaving(true)
     try {
       const key = await saveApiKey({
-        provider,
-        endpoint: endpoint.trim(),
+        provider: "groq",
+        endpoint: GROQ_ENDPOINT,
         apiKey: apiKey.trim(),
-        model: model.trim(),
-        label: label.trim() || `${AI_PROVIDERS.find((p) => p.id === provider)?.name} — ${model}`,
+        model: GROQ_MODEL,
+        label: label.trim() || "Groq key",
       })
       onSaved(key)
     } finally {
@@ -128,42 +112,10 @@ function AddKeyForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-[12px] border border-border bg-background/60 p-5 space-y-3"
+      className="border-2 border-black bg-white p-5 space-y-3"
     >
       <div>
-        <label htmlFor={providerId} className="block text-[13px] font-medium text-foreground mb-1">
-          Provider
-        </label>
-        <select
-          id={providerId}
-          value={provider}
-          onChange={(e) => handleProviderChange(e.target.value as AiProvider)}
-          className="w-full rounded-[8px] border border-border bg-background px-3 py-2 text-[14px] text-foreground outline-none"
-        >
-          {AI_PROVIDERS.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <label htmlFor={endpointId} className="block text-[13px] font-medium text-foreground mb-1">
-          Endpoint URL
-        </label>
-        <input
-          id={endpointId}
-          type="url"
-          value={endpoint}
-          onChange={(e) => setEndpoint(e.target.value)}
-          required
-          className="w-full rounded-[8px] border border-border bg-background px-3 py-2 text-[14px] text-foreground outline-none"
-        />
-      </div>
-
-      <div>
-        <label htmlFor={apiKeyId} className="block text-[13px] font-medium text-foreground mb-1">
+        <label htmlFor={apiKeyId} className="block text-[13px] font-medium text-[#1a1a1a] mb-1">
           API key
         </label>
         <div className="flex gap-2">
@@ -173,8 +125,8 @@ function AddKeyForm({
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             required
-            placeholder="sk-..."
-            className="flex-1 rounded-[8px] border border-border bg-background px-3 py-2 text-[14px] text-foreground outline-none"
+            placeholder="gsk_..."
+            className="flex-1 border-2 border-black bg-white px-3 py-2 text-[14px] text-[#1a1a1a] outline-none"
           />
           <Button
             type="button"
@@ -189,21 +141,7 @@ function AddKeyForm({
       </div>
 
       <div>
-        <label htmlFor={modelId} className="block text-[13px] font-medium text-foreground mb-1">
-          Model
-        </label>
-        <input
-          id={modelId}
-          type="text"
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-          required
-          className="w-full rounded-[8px] border border-border bg-background px-3 py-2 text-[14px] text-foreground outline-none"
-        />
-      </div>
-
-      <div>
-        <label htmlFor={labelId} className="block text-[13px] font-medium text-foreground mb-1">
+        <label htmlFor={labelId} className="block text-[13px] font-medium text-[#1a1a1a] mb-1">
           Label (optional)
         </label>
         <input
@@ -211,8 +149,8 @@ function AddKeyForm({
           type="text"
           value={label}
           onChange={(e) => setLabel(e.target.value)}
-          placeholder={`${AI_PROVIDERS.find((p) => p.id === provider)?.name} — ${model}`}
-          className="w-full rounded-[8px] border border-border bg-background px-3 py-2 text-[14px] text-foreground outline-none"
+          placeholder="Groq key"
+          className="w-full border-2 border-black bg-white px-3 py-2 text-[14px] text-[#1a1a1a] outline-none"
         />
       </div>
 
@@ -239,12 +177,12 @@ function KeyRow({
   const [showKey, setShowKey] = useState(false)
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-[8px] border border-border bg-background/60 px-4 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-2 border-black bg-white px-4 py-3">
       <div className="min-w-0">
-        <p className="text-[14px] font-medium text-foreground truncate">
+        <p className="text-[14px] font-medium text-[#1a1a1a] truncate">
           {storedKey.label}
         </p>
-        <p className="font-mono text-[12px] text-muted-foreground truncate">
+        <p className="font-mono text-[12px] text-[#757575] truncate">
           {storedKey.endpoint}
         </p>
       </div>
@@ -252,7 +190,7 @@ function KeyRow({
         <button
           type="button"
           onClick={() => setShowKey((s) => !s)}
-          className="rounded-[6px] p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+          className="p-1.5 text-[#757575] hover:text-[#1a1a1a] transition-colors"
           aria-label={showKey ? "Hide key" : "Show key"}
         >
           {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -260,7 +198,7 @@ function KeyRow({
         <button
           type="button"
           onClick={onDelete}
-          className="rounded-[6px] p-1.5 text-muted-foreground hover:text-destructive transition-colors"
+          className="p-1.5 text-[#757575] hover:text-[#A8321A] transition-colors"
           aria-label="Delete key"
         >
           <Trash2 className="size-4" />
@@ -268,7 +206,7 @@ function KeyRow({
       </div>
       {showKey && (
         <div className="basis-full mt-2">
-          <p className="font-mono text-[11px] text-muted-foreground break-all">
+          <p className="font-mono text-[11px] text-[#757575] break-all">
             {storedKey.apiKey}
           </p>
         </div>

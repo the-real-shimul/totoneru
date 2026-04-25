@@ -174,7 +174,6 @@ function ManualCardEditor({
       }
 
       const raw = await sendAiRequest({
-        provider: key.provider,
         config: {
           endpoint: key.endpoint,
           apiKey: key.apiKey,

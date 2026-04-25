@@ -123,7 +123,6 @@ async function applyAiPromptToNote({
 
   const response = await withRetry(() =>
     sendAiRequest({
-      provider: key.provider,
       messages,
       config: {
         endpoint: key.endpoint,

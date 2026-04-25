@@ -14,9 +14,8 @@ export type AiAdapter = {
   send(messages: AiMessage[], config: AiAdapterConfig): Promise<string>
 }
 
-export type AiProvider = "openai" | "anthropic"
+export type AiProvider = "groq"
 
 export const AI_PROVIDERS: { id: AiProvider; name: string }[] = [
-  { id: "openai", name: "OpenAI-compatible" },
-  { id: "anthropic", name: "Anthropic (native)" },
+  { id: "groq", name: "Groq" },
 ]

@@ -281,17 +281,17 @@ export function BatchRunner({
       </div>
 
       {isRunning && !isDryRun && (
-        <div className="rounded-[12px] border border-border bg-background/60 p-4">
+        <div className=" border-2 border-black bg-white p-4">
           <div className="flex items-center justify-between gap-3 mb-2">
-            <p className="text-[14px] font-medium text-foreground" id="batch-progress-label">
+            <p className="text-[14px] font-medium text-[#1a1a1a]" id="batch-progress-label">
               Processing cards...
             </p>
-            <span className="font-mono text-[12px] text-muted-foreground" aria-hidden="true">
+            <span className="font-mono text-[12px] text-[#757575]" aria-hidden="true">
               {progress.current}/{progress.total}
             </span>
           </div>
           <div
-            className="h-2 rounded-full bg-muted overflow-hidden"
+            className="h-2 bg-[#f5f5f5] overflow-hidden"
             role="progressbar"
             aria-labelledby="batch-progress-label"
             aria-valuenow={progress.current}
@@ -299,7 +299,7 @@ export function BatchRunner({
             aria-valuemax={progress.total}
           >
             <div
-              className="h-full rounded-full bg-[#4A7A4E] transition-all duration-300"
+              className="h-full bg-[#4A7A4E] transition-all duration-300"
               style={{
                 width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%`,
               }}
@@ -333,21 +333,21 @@ function BatchSummary({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-full bg-[rgba(74,122,78,0.12)] px-2.5 py-1 font-mono text-[11px] font-semibold text-[#2E5C33]">
+        <span className=" bg-[rgba(74,122,78,0.12)] px-2.5 py-1 font-mono text-[11px] font-semibold text-[#2E5C33]">
           {result.successCount} success
         </span>
         {result.failedCount > 0 && (
-          <span className="rounded-full bg-[rgba(217,58,38,0.10)] px-2.5 py-1 font-mono text-[11px] font-semibold text-[#A8321A]">
+          <span className=" bg-[rgba(217,58,38,0.10)] px-2.5 py-1 font-mono text-[11px] font-semibold text-[#A8321A]">
             {result.failedCount} failed
           </span>
         )}
         {changedCount > 0 && (
-          <span className="rounded-full bg-muted px-2.5 py-1 font-mono text-[11px] font-semibold text-muted-foreground">
+          <span className=" bg-[#f5f5f5] px-2.5 py-1 font-mono text-[11px] font-semibold text-[#757575]">
             {changedCount} changed
           </span>
         )}
         {isDryRun && (
-          <span className="rounded-full bg-[rgba(184,135,58,0.12)] px-2.5 py-1 font-mono text-[11px] font-semibold text-[#8A6528]">
+          <span className=" bg-[rgba(184,135,58,0.12)] px-2.5 py-1 font-mono text-[11px] font-semibold text-[#8A6528]">
             Dry-run
           </span>
         )}
@@ -389,12 +389,12 @@ function CardResultRow({
 
   return (
     <div
-      className={`rounded-[12px] border p-4 ${
+      className={` border p-4 ${
         card.status === "error"
           ? "border-[rgba(217,58,38,0.20)] bg-[rgba(217,58,38,0.04)]"
           : card.changed
             ? "border-[rgba(74,122,78,0.20)] bg-[rgba(74,122,78,0.04)]"
-            : "border-border bg-background/60"
+            : "border-border bg-white"
       }`}
     >
       <button
@@ -409,18 +409,18 @@ function CardResultRow({
           ) : card.changed ? (
             <CheckCircle className="size-4 text-[#4A7A4E]" />
           ) : (
-            <CheckCircle className="size-4 text-muted-foreground" />
+            <CheckCircle className="size-4 text-[#757575]" />
           )}
-          <span className="text-[14px] font-medium text-foreground">
+          <span className="text-[14px] font-medium text-[#1a1a1a]">
             Card #{card.noteId}
           </span>
           {noteType && (
-            <span className="font-mono text-[12px] text-muted-foreground">
+            <span className="font-mono text-[12px] text-[#757575]">
               {noteType.name}
             </span>
           )}
         </div>
-        <span className="font-mono text-[11px] text-muted-foreground">
+        <span className="font-mono text-[11px] text-[#757575]">
           {card.changed ? `${diffs.length} changes` : card.status === "error" ? "Error" : "No change"}
         </span>
       </button>
@@ -432,24 +432,24 @@ function CardResultRow({
       {expanded && diffs.length > 0 && (
         <div className="mt-3 space-y-2">
           {diffs.map((diff) => (
-            <div key={diff.fieldName} className="rounded-[8px] border border-border bg-card p-3">
-              <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+            <div key={diff.fieldName} className=" border-2 border-black bg-white p-3">
+              <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#757575]">
                 {diff.fieldName}
               </p>
               <div className="mt-2 grid gap-2 md:grid-cols-2">
-                <div className="rounded-[6px] border border-border px-3 py-2">
-                  <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                <div className=" border-2 border-black px-3 py-2">
+                  <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#757575]">
                     Before
                   </p>
-                  <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-[13px] text-foreground">
+                  <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-[13px] text-[#1a1a1a]">
                     {diff.before || "(empty)"}
                   </p>
                 </div>
-                <div className="rounded-[6px] border border-border px-3 py-2">
-                  <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                <div className=" border-2 border-black px-3 py-2">
+                  <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#757575]">
                     After
                   </p>
-                  <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-[13px] text-foreground">
+                  <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-[13px] text-[#1a1a1a]">
                     {diff.after || "(empty)"}
                   </p>
                 </div>

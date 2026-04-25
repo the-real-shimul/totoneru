@@ -62,7 +62,7 @@ export function getIterationNav(
   base = `/iterations/${iteration}`
 ): IterationNavItem[] {
   return [
-    { key: "home", label: "Front Page", href: base, icon: LibraryBig },
+    { key: "home", label: "Front Page", href: base || "/", icon: LibraryBig },
     { key: "import", label: "Import", href: `${base}/import`, icon: Upload },
     { key: "add", label: "Add Cards", href: `${base}/add-cards`, icon: FilePlus2 },
     { key: "ai", label: "AI", href: `${base}/ai`, icon: Bot },

@@ -33,7 +33,7 @@ export function IterationShell({
     <DocumentationProvider>
       <div
         className={cn(
-          "min-h-svh bg-white text-[#1a1a1a] dark:bg-[#111] dark:text-white",
+          "min-h-svh bg-white text-[#1a1a1a]",
           tone.silly && "iteration-silly"
         )}
       >
@@ -43,9 +43,9 @@ export function IterationShell({
         >
           Skip to content
         </a>
-        <header className="border-b-2 border-black bg-white text-black dark:bg-[#111] dark:text-white">
+        <header className="border-b-2 border-black bg-white text-black">
           <div className="mx-auto grid max-w-[1500px] gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
-            <Link href={basePath ?? `/iterations/${iteration}`} className="group">
+            <Link href={basePath === "" ? "/" : (basePath ?? `/iterations/${iteration}`)} className="group">
               <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[#757575]">
                 {eyebrow}
               </p>
@@ -62,8 +62,8 @@ export function IterationShell({
                     key={item.key}
                     href={item.href}
                     className={cn(
-                      "inline-flex min-h-11 items-center gap-1 border-2 border-transparent px-3 py-2 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors hover:border-black hover:text-[#057dbc] dark:hover:border-white",
-                      selected && "border-black bg-black text-white dark:border-white"
+                      "inline-flex min-h-11 items-center gap-1 border-2 border-transparent px-3 py-2 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors hover:border-black hover:text-[#057dbc]",
+                      selected && "border-black bg-black text-white"
                     )}
                   >
                     <Icon className="size-3.5" />

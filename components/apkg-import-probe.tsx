@@ -1,6 +1,6 @@
 "use client"
 
-import { ChevronLeft, ChevronRight, LoaderCircle, Play, Upload, X } from "lucide-react"
+import { ChevronLeft, ChevronRight, LoaderCircle, Upload, X } from "lucide-react"
 import { useCallback, useId, useMemo, useRef, useState, useTransition, useEffect } from "react"
 
 import { Button } from "@/components/ui/button"
@@ -45,17 +45,7 @@ import {
   type TransformationConfig,
   type TransformationType,
 } from "@/lib/transformations"
-import type { BatchResult } from "@/lib/batch-operations"
-import { AiSettings } from "@/components/ai-settings"
-import { BatchRunner } from "@/components/batch-runner"
 import { BlockEditor, generatePreviewWithBlocks } from "@/components/block-editor"
-import { ExportPanel } from "@/components/export-panel"
-import { PromptEditor, PromptLibrary } from "@/components/prompt-library"
-import type { UserPrompt } from "@/lib/prompts"
-import { estimateCost, estimateTokens, interpolatePrompt, sanitizeAiOutput } from "@/lib/prompts"
-import { sendAiRequest } from "@/lib/ai-client"
-import { getActiveApiKey } from "@/lib/ai-keys"
-import type { AiMessage } from "@/lib/ai-types"
 import type { LayoutConfig } from "@/lib/block-editor"
 
 type FieldDiff = {
@@ -172,7 +162,7 @@ export function ApkgImportProbe() {
   return (
     <div className="space-y-5">
       {/* Upload card */}
-      <div className="rounded-[20px] border border-border bg-card p-10 shadow-[0_1px_3px_rgba(26,26,26,0.03)]">
+      <div className=" border-2 border-black bg-white p-10 ">
         <input
           ref={inputRef}
           id={inputId}
@@ -185,7 +175,7 @@ export function ApkgImportProbe() {
         {result.status === "idle" && (
           <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-2">
-              <p className="text-[20px] font-medium text-foreground">Choose a deck to import</p>
+              <p className="text-[20px] font-medium text-[#1a1a1a]">Choose a deck to import</p>
               <p className="text-[15px] leading-[1.55] text-[#4A4744]">
                 Reads notes, note types, templates, and media manifest entirely in the browser.
                 Nothing is uploaded.
@@ -207,7 +197,7 @@ export function ApkgImportProbe() {
         {result.status === "error" && (
           <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-2">
-              <p className="text-[15px] font-medium text-destructive">Import failed</p>
+              <p className="text-[15px] font-medium text-[#A8321A]">Import failed</p>
               <p className="text-[15px] leading-[1.55] text-[#4A4744]">{result.message}</p>
             </div>
             <Button
@@ -228,8 +218,8 @@ export function ApkgImportProbe() {
         {result.status === "success" && (
           <div className="flex items-center justify-between gap-6">
             <div className="space-y-1">
-              <p className="text-[15px] font-medium text-foreground">{result.activeDeck.fileName}</p>
-              <p className="font-mono text-[12px] text-muted-foreground">
+              <p className="text-[15px] font-medium text-[#1a1a1a]">{result.activeDeck.fileName}</p>
+              <p className="font-mono text-[12px] text-[#757575]">
                 Active workspace · {Math.round(result.activeDeck.fileSize / 1024)} KB ·{" "}
                 {new Date(result.activeDeck.importedAt).toLocaleString()}
               </p>
@@ -277,10 +267,7 @@ function DeckResults({
   const [transformationConfigs, setTransformationConfigs] = useState<TransformationConfig[]>(
     () => DEFAULT_TRANSFORMATIONS.map((t) => ({ ...t }))
   )
-  const [selectedPrompt, setSelectedPrompt] = useState<UserPrompt | null>(null)
-  const [showPromptEditor, setShowPromptEditor] = useState(false)
   const [blockLayouts, setBlockLayouts] = useState<Record<string, LayoutConfig>>({})
-  const [batchResult, setBatchResult] = useState<BatchResult | null>(null)
   const summary = deck.deck
   const selectedNote = summary.sampleNotes[selectedNoteIndex] ?? null
 
@@ -300,10 +287,6 @@ function DeckResults({
       noteTypeMappings.get(noteTypeId)?.templateSelection ?? "none",
     [noteTypeMappings]
   )
-
-  const handleBatchResultChange = useCallback((result: BatchResult | null) => {
-    setBatchResult(result)
-  }, [])
 
   const handleBlockLayoutChange = useCallback((noteTypeId: string, layout: LayoutConfig) => {
     setBlockLayouts((prev) => ({
@@ -357,16 +340,16 @@ function DeckResults({
           {summary.noteTypes.map((noteType) => (
             <div
               key={noteType.id}
-              className="rounded-[12px] border border-border bg-background/60 p-5"
+              className=" border-2 border-black bg-white p-5"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[16px] font-medium text-foreground">{noteType.name}</p>
-                  <p className="mt-0.5 font-mono text-[12px] text-muted-foreground">
+                  <p className="text-[16px] font-medium text-[#1a1a1a]">{noteType.name}</p>
+                  <p className="mt-0.5 font-mono text-[12px] text-[#757575]">
                     ID {noteType.id}
                   </p>
                 </div>
-                <span className="shrink-0 rounded-full border border-border bg-muted px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+                <span className="shrink-0 border-2 border-black bg-[#f5f5f5] px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.04em] text-[#757575]">
                   {noteType.templates.length} templates
                 </span>
               </div>
@@ -419,46 +402,10 @@ function DeckResults({
         </div>
       </SectionCard>
 
-      {/* AI settings */}
-      <SectionCard label="AI" heading="API keys">
-        <AiSettings />
-      </SectionCard>
-
-      {/* Prompt library */}
-      <SectionCard label="Prompts" heading="AI prompt library">
-        <div className="space-y-4">
-          <PromptLibrary
-            activeDeck={deck}
-            onSelectPrompt={setSelectedPrompt}
-            selectedPromptId={selectedPrompt?.id ?? null}
-          />
-          <div className="border-t border-border pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowPromptEditor((s) => !s)}
-            >
-              {showPromptEditor ? "Cancel" : "Create custom prompt"}
-            </Button>
-            {showPromptEditor && (
-              <div className="mt-3">
-                <PromptEditor
-                  onSave={(prompt) => {
-                    setSelectedPrompt(prompt)
-                    setShowPromptEditor(false)
-                  }}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-      </SectionCard>
-
       {/* Card browser */}
       <SectionCard label="Sample notes" heading="Card browser">
         <div className="flex items-center justify-between gap-3 pb-4">
-          <p className="text-[14px] text-muted-foreground">
+          <p className="text-[14px] text-[#757575]">
             Showing up to 50 sample notes parsed from this deck.
           </p>
           <div className="flex items-center gap-2 shrink-0">
@@ -472,7 +419,7 @@ function DeckResults({
             >
               <ChevronLeft />
             </Button>
-            <span className="min-w-12 text-center font-mono text-[12px] text-muted-foreground">
+            <span className="min-w-12 text-center font-mono text-[12px] text-[#757575]">
               {selectedNoteIndex + 1}/{summary.sampleNotes.length}
             </span>
             <Button
@@ -514,15 +461,15 @@ function DeckResults({
               {transformationConfigs.map((config) => (
                 <label
                   key={config.type}
-                  className="flex cursor-pointer items-center justify-between gap-3 rounded-[8px] border border-border bg-background/60 px-4 py-3"
+                  className="flex cursor-pointer items-center justify-between gap-3 border-2 border-black bg-white px-4 py-3"
                 >
                   <div>
-                    <p className="text-[14px] font-medium text-foreground">
+                    <p className="text-[14px] font-medium text-[#1a1a1a]">
                       {config.type === "furigana" && "Furigana generation"}
                       {config.type === "htmlClean" && "HTML cleaner"}
                       {config.type === "fieldNormalize" && "Field normalizer"}
                     </p>
-                    <p className="text-[12px] text-muted-foreground">
+                    <p className="text-[12px] text-[#757575]">
                       {config.type === "furigana" && "Add ruby annotations to kanji using kuromoji.js"}
                       {config.type === "htmlClean" && "Strip font/span/style/class tags"}
                       {config.type === "fieldNormalize" && "Normalize whitespace and line endings"}
@@ -532,43 +479,12 @@ function DeckResults({
                     type="checkbox"
                     checked={config.enabled}
                     onChange={() => toggleTransformation(config.type)}
-                    className="size-4 accent-foreground"
+                    className="size-4 accent-black"
                   />
                 </label>
               ))}
             </div>
           </SectionCard>
-
-          {/* Batch operations */}
-          <SectionCard label="Batch" heading="Apply transformations">
-            <BatchRunner
-              activeDeck={deck}
-              transformationConfigs={transformationConfigs}
-              selectedPrompt={selectedPrompt}
-              getFieldMappings={getFieldMappings}
-              getTemplateSelection={getTemplateSelection}
-              onBatchResultChange={handleBatchResultChange}
-            />
-          </SectionCard>
-
-          {/* Export */}
-          <SectionCard label="Export" heading="Finalize &amp; download">
-            <ExportPanel
-              activeDeck={deck}
-              transformationConfigs={transformationConfigs}
-              batchResult={batchResult}
-            />
-          </SectionCard>
-
-          {/* AI transformation */}
-          {selectedPrompt && (
-            <AiTransformSection
-              prompt={selectedPrompt}
-              note={selectedNote}
-              noteTypes={summary.noteTypes}
-              getFieldMappings={getFieldMappings}
-            />
-          )}
 
           <CardPreviewSection
             note={selectedNote}
@@ -588,18 +504,18 @@ function DeckResults({
       <div className="grid gap-5 lg:grid-cols-2">
         <SectionCard label="Assets" heading="Media manifest">
           {summary.mediaSamples.length === 0 ? (
-            <p className="text-[15px] text-muted-foreground">No media entries found.</p>
+            <p className="text-[15px] text-[#757575]">No media entries found.</p>
           ) : (
             <div className="space-y-2">
               {summary.mediaSamples.map((item) => (
                 <div
                   key={`${item.archiveName}-${item.fileName}`}
-                  className="flex items-center justify-between gap-3 rounded-[8px] border border-border bg-background/60 px-4 py-2.5"
+                  className="flex items-center justify-between gap-3 border-2 border-black bg-white px-4 py-2.5"
                 >
-                  <span className="font-mono text-[12px] text-muted-foreground">
+                  <span className="font-mono text-[12px] text-[#757575]">
                     {item.archiveName}
                   </span>
-                  <span className="truncate text-[14px] text-foreground">{item.fileName}</span>
+                  <span className="truncate text-[14px] text-[#1a1a1a]">{item.fileName}</span>
                 </div>
               ))}
             </div>
@@ -612,7 +528,7 @@ function DeckResults({
               {summary.tableNames.map((name) => (
                 <span
                   key={name}
-                  className="rounded-[6px] border border-border bg-muted px-2 py-1 font-mono text-[12px] text-muted-foreground"
+                  className=" border-2 border-black bg-[#f5f5f5] px-2 py-1 font-mono text-[12px] text-[#757575]"
                 >
                   {name}
                 </span>
@@ -645,11 +561,11 @@ function SectionCard({
   children: React.ReactNode
 }) {
   return (
-    <div className="rounded-[20px] border border-border bg-card p-8 shadow-[0_1px_3px_rgba(26,26,26,0.03)]">
-      <p className="mb-1 font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+    <div className=" border-2 border-black bg-white p-8 ">
+      <p className="mb-1 font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-[#757575]">
         {label}
       </p>
-      <h3 className="mb-6 text-[20px] font-medium text-foreground">{heading}</h3>
+      <h3 className="mb-6 text-[20px] font-medium text-[#1a1a1a]">{heading}</h3>
       {children}
     </div>
   )
@@ -657,22 +573,22 @@ function SectionCard({
 
 function BigStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[12px] border border-border bg-background/60 p-5">
-      <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+    <div className=" border-2 border-black bg-white p-5">
+      <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-[#757575]">
         {label}
       </p>
-      <p className="mt-2 font-mono text-[28px] font-medium text-foreground">{value}</p>
+      <p className="mt-2 font-mono text-[28px] font-medium text-[#1a1a1a]">{value}</p>
     </div>
   )
 }
 
 function SmallStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[8px] border border-border bg-background/60 px-4 py-3">
-      <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+    <div className=" border-2 border-black bg-white px-4 py-3">
+      <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#757575]">
         {label}
       </p>
-      <p className="mt-1 break-all font-mono text-[13px] text-foreground">{value}</p>
+      <p className="mt-1 break-all font-mono text-[13px] text-[#1a1a1a]">{value}</p>
     </div>
   )
 }
@@ -680,14 +596,14 @@ function SmallStat({ label, value }: { label: string; value: string }) {
 function FieldChipRow({ label, values }: { label: string; values: string[] }) {
   return (
     <div>
-      <p className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+      <p className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#757575]">
         {label}
       </p>
       <div className="flex flex-wrap gap-1.5">
         {values.map((v) => (
           <span
             key={v}
-            className="rounded-[6px] border border-border bg-muted px-2 py-0.5 font-mono text-[12px] text-foreground"
+            className=" border-2 border-black bg-[#f5f5f5] px-2 py-0.5 font-mono text-[12px] text-[#1a1a1a]"
           >
             {v}
           </span>
@@ -709,15 +625,15 @@ function MappingSuggestionCard({
   onRoleChange: (fieldName: string, role: FieldRole) => void
 }) {
   return (
-    <div className="rounded-[12px] border border-border bg-background/60 p-5">
+    <div className=" border-2 border-black bg-white p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <p className="text-[16px] font-medium text-foreground">{noteType.name}</p>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">
+          <p className="text-[16px] font-medium text-[#1a1a1a]">{noteType.name}</p>
+          <p className="mt-0.5 text-[13px] text-[#757575]">
             Heuristic only. Editable mapping comes next.
           </p>
         </div>
-        <span className="shrink-0 rounded-full border border-border bg-muted px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+        <span className="shrink-0 border-2 border-black bg-[#f5f5f5] px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.04em] text-[#757575]">
           {suggestions.length} fields
         </span>
       </div>
@@ -745,9 +661,9 @@ function FieldRoleRow({
   onRoleChange: (role: FieldRole) => void
 }) {
   return (
-    <div className="rounded-[8px] border border-border bg-card px-4 py-3">
+    <div className=" border-2 border-black bg-white px-4 py-3">
       <div className="flex items-center justify-between gap-3">
-        <p className="min-w-0 truncate font-mono text-[12px] text-foreground">
+        <p className="min-w-0 truncate font-mono text-[12px] text-[#1a1a1a]">
           {suggestion.fieldName}
         </p>
         <ConfidenceBadge confidence={suggestion.confidence} />
@@ -757,7 +673,7 @@ function FieldRoleRow({
         <select
           value={selectedRole}
           onChange={(event) => onRoleChange(event.target.value as FieldRole)}
-          className="w-full rounded-[8px] border border-border bg-background px-3 py-2 text-[14px] font-medium text-foreground outline-none transition-colors focus:border-foreground/40"
+          className="w-full border-2 border-black bg-white px-3 py-2 text-[14px] font-medium text-[#1a1a1a] outline-none transition-colors focus:border-black/40"
         >
           {fieldRoleOptions.map((role) => (
             <option key={role} value={role}>
@@ -766,7 +682,7 @@ function FieldRoleRow({
           ))}
         </select>
       </label>
-      <p className="mt-1 line-clamp-2 text-[12px] text-muted-foreground">
+      <p className="mt-1 line-clamp-2 text-[12px] text-[#757575]">
         Suggested: {getFieldRoleLabel(suggestion.role)} ·{" "}
         {suggestion.reasons.join("; ")}
       </p>
@@ -780,7 +696,7 @@ function ConfidenceBadge({ confidence }: { confidence: number }) {
 
   return (
     <span
-      className="rounded-[6px] border border-border bg-muted px-2 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground"
+      className=" border-2 border-black bg-[#f5f5f5] px-2 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-[0.04em] text-[#757575]"
       title={`${percent}% confidence`}
     >
       {label} · {percent}%
@@ -803,151 +719,29 @@ function NoteRow({
     <button
       type="button"
       aria-pressed={isSelected}
-      className="w-full rounded-[12px] border border-border bg-background/60 p-5 text-left transition-colors hover:bg-muted/50 data-[selected=true]:border-foreground/20 data-[selected=true]:bg-muted"
+      className="w-full border-2 border-black bg-white p-5 text-left transition-colors hover:bg-[#f5f5f5] data-[selected=true]:border-black/20 data-[selected=true]:bg-[#f5f5f5]"
       data-selected={isSelected}
       onClick={onClick}
     >
       <div className="flex items-start justify-between gap-3">
-        <p className="text-[15px] font-medium text-foreground">
+        <p className="text-[15px] font-medium text-[#1a1a1a]">
           {noteType?.name ?? "Unknown note type"}
         </p>
-        <span className="shrink-0 font-mono text-[12px] text-muted-foreground">
+        <span className="shrink-0 font-mono text-[12px] text-[#757575]">
           #{note.id}
         </span>
       </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {note.fieldValues.slice(0, 4).map((value, i) => (
-          <div key={`${note.id}-${i}`} className="rounded-[8px] border border-border bg-muted/40 px-3 py-2">
-            <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+          <div key={`${note.id}-${i}`} className=" border-2 border-black bg-[#f5f5f5] px-3 py-2">
+            <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#757575]">
               {noteType?.fieldNames[i] ?? `Field ${i + 1}`}
             </p>
-            <p className="mt-1 line-clamp-2 text-[13px] text-foreground">{value || "(empty)"}</p>
+            <p className="mt-1 line-clamp-2 text-[13px] text-[#1a1a1a]">{value || "(empty)"}</p>
           </div>
         ))}
       </div>
     </button>
-  )
-}
-
-function AiTransformSection({
-  prompt,
-  note,
-  noteTypes,
-  getFieldMappings,
-}: {
-  prompt: UserPrompt
-  note: ParsedNote
-  noteTypes: ParsedNoteType[]
-  getFieldMappings: (noteTypeId: string) => Record<string, FieldRole>
-}) {
-  const [result, setResult] = useState("")
-  const [isRunning, setIsRunning] = useState(false)
-  const [error, setError] = useState("")
-
-  const noteType = noteTypes.find((nt) => nt.id === note.noteTypeId)
-  const fieldMappings = noteType ? getFieldMappings(noteType.id) : {}
-
-  const roleToFieldName: Record<string, string> = {}
-  for (const [fieldName, role] of Object.entries(fieldMappings)) {
-    roleToFieldName[role] = fieldName
-  }
-
-  const variableValues: Record<string, string> = {}
-  for (const variable of prompt.variables) {
-    const fieldName = roleToFieldName[variable.role]
-    if (fieldName && noteType) {
-      const index = noteType.fieldNames.indexOf(fieldName)
-      if (index >= 0) {
-        variableValues[variable.name] = note.fieldValues[index] ?? ""
-      }
-    }
-  }
-
-  const interpolatedSystem = interpolatePrompt(prompt.systemMessage, variableValues)
-  const interpolatedUser = interpolatePrompt(prompt.userMessage, variableValues)
-  const tokenEstimate = estimateTokens(interpolatedSystem + interpolatedUser)
-  const costEstimate = estimateCost(tokenEstimate, "gpt-4o-mini")
-
-  async function handleRun() {
-    setIsRunning(true)
-    setError("")
-    setResult("")
-
-    try {
-      const key = await getActiveApiKey()
-      if (!key) {
-        setError("No API key saved. Add one in the AI settings above.")
-        return
-      }
-
-      const messages: AiMessage[] = []
-      if (interpolatedSystem) {
-        messages.push({ role: "system", content: interpolatedSystem })
-      }
-      messages.push({ role: "user", content: interpolatedUser })
-
-      const response = await sendAiRequest({
-        provider: key.provider,
-        messages,
-        config: {
-          endpoint: key.endpoint,
-          apiKey: key.apiKey,
-          model: key.model,
-        },
-      })
-
-      setResult(sanitizeAiOutput(response))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "AI request failed")
-    } finally {
-      setIsRunning(false)
-    }
-  }
-
-  return (
-    <SectionCard label="AI" heading={`Run: ${prompt.name}`}>
-      <div className="space-y-3">
-        <div className="rounded-[8px] border border-border bg-background/60 px-4 py-3">
-          <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-            Interpolated prompt
-          </p>
-          <p className="mt-1 whitespace-pre-wrap text-[13px] text-foreground">
-            {interpolatedUser || "(no variables matched)"}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Button
-            type="button"
-            onClick={handleRun}
-            disabled={isRunning}
-          >
-            {isRunning ? <LoaderCircle className="animate-spin" /> : <Play />}
-            {isRunning ? "Running..." : "Run on sample"}
-          </Button>
-          <span className="font-mono text-[11px] text-muted-foreground">
-            ~{tokenEstimate} tokens · ~${costEstimate.toFixed(4)}
-          </span>
-        </div>
-
-        {error && (
-          <p className="rounded-[8px] bg-[rgba(217,58,38,0.10)] px-4 py-3 text-[13px] text-[#A8321A]">
-            {error}
-          </p>
-        )}
-
-        {result && (
-          <div className="rounded-[8px] border border-border bg-background/60 px-4 py-3">
-            <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-              Result
-            </p>
-            <p className="mt-1 whitespace-pre-wrap text-[13px] text-foreground">
-              {result}
-            </p>
-          </div>
-        )}
-      </div>
-    </SectionCard>
   )
 }
 
@@ -974,7 +768,7 @@ function CardPreviewSection({
   if (!noteType || !template) {
     return (
       <SectionCard label="Render" heading="Card preview">
-        <p className="text-[15px] text-muted-foreground">
+        <p className="text-[15px] text-[#757575]">
           This note has no renderable card template.
         </p>
       </SectionCard>
@@ -1147,18 +941,18 @@ function CardPreviewContent({
         </div>
       )}
       <div className="mb-4 flex items-center gap-2">
-        <span className="font-mono text-[12px] text-muted-foreground">{noteType.name}</span>
-        <span className="text-muted-foreground">·</span>
-        <span className="font-mono text-[12px] text-muted-foreground">{template.name}</span>
+        <span className="font-mono text-[12px] text-[#757575]">{noteType.name}</span>
+        <span className="text-[#757575]">·</span>
+        <span className="font-mono text-[12px] text-[#757575]">{template.name}</span>
         {templateType !== "none" && (
           <>
-            <span className="text-muted-foreground">·</span>
-            <span className="rounded-[6px] border border-border bg-muted px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+            <span className="text-[#757575]">·</span>
+            <span className=" border-2 border-black bg-[#f5f5f5] px-2 py-0.5 font-mono text-[11px] text-[#757575]">
               {templateType} template
             </span>
           </>
         )}
-        <span className="ml-auto rounded-[6px] border border-border bg-muted px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+        <span className="ml-auto border-2 border-black bg-[#f5f5f5] px-2 py-0.5 font-mono text-[11px] text-[#757575]">
           sandboxed iframe
         </span>
       </div>
@@ -1200,17 +994,17 @@ function TemplateSelectionCard({
   const isSuggested = match?.template.id === selectedTemplate && match.score >= 0.5
 
   return (
-    <div className="rounded-[12px] border border-border bg-background/60 p-5">
+    <div className=" border-2 border-black bg-white p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <p className="text-[16px] font-medium text-foreground">{noteType.name}</p>
+          <p className="text-[16px] font-medium text-[#1a1a1a]">{noteType.name}</p>
           {match && match.score >= 0.5 && (
-            <p className="mt-0.5 text-[13px] text-muted-foreground">
+            <p className="mt-0.5 text-[13px] text-[#757575]">
               Suggested: {match.template.name} ({Math.round(match.score * 100)}% match)
             </p>
           )}
         </div>
-        <span className="shrink-0 rounded-full border border-border bg-muted px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+        <span className="shrink-0 border-2 border-black bg-[#f5f5f5] px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.04em] text-[#757575]">
           {noteType.fieldNames.length} fields
         </span>
       </div>
@@ -1220,7 +1014,7 @@ function TemplateSelectionCard({
         <select
           value={selectedTemplate}
           onChange={(event) => onTemplateChange(event.target.value as TemplateType)}
-          className="w-full rounded-[8px] border border-border bg-background px-3 py-2 text-[14px] font-medium text-foreground outline-none transition-colors focus:border-foreground/40"
+          className="w-full border-2 border-black bg-white px-3 py-2 text-[14px] font-medium text-[#1a1a1a] outline-none transition-colors focus:border-black/40"
         >
           {TEMPLATE_OPTIONS.map((option) => (
             <option key={option} value={option}>
@@ -1238,7 +1032,7 @@ function TemplateSelectionCard({
       )}
 
       {isSuggested && (
-        <p className="mt-2 text-[12px] text-muted-foreground">
+        <p className="mt-2 text-[12px] text-[#757575]">
           This template was auto-selected based on detected field roles.
         </p>
       )}
@@ -1260,7 +1054,7 @@ function TemplateFieldChecklist({
     <div className="mt-3 space-y-2">
       {template.requiredRoles.length > 0 && (
         <div>
-          <p className="mb-1 font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+          <p className="mb-1 font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#757575]">
             Required
           </p>
           <div className="flex flex-wrap gap-1.5">
@@ -1269,7 +1063,7 @@ function TemplateFieldChecklist({
               return (
                 <span
                   key={role}
-                  className={`rounded-[6px] px-2 py-0.5 font-mono text-[11px] ${
+                  className={` px-2 py-0.5 font-mono text-[11px] ${
                     present
                       ? "bg-[rgba(74,122,78,0.12)] text-[#2E5C33]"
                       : "bg-[rgba(217,58,38,0.10)] text-[#A8321A]"
@@ -1284,7 +1078,7 @@ function TemplateFieldChecklist({
       )}
       {template.optionalRoles.length > 0 && (
         <div>
-          <p className="mb-1 font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+          <p className="mb-1 font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#757575]">
             Optional
           </p>
           <div className="flex flex-wrap gap-1.5">
@@ -1293,10 +1087,10 @@ function TemplateFieldChecklist({
               return (
                 <span
                   key={role}
-                  className={`rounded-[6px] px-2 py-0.5 font-mono text-[11px] ${
+                  className={` px-2 py-0.5 font-mono text-[11px] ${
                     present
                       ? "bg-[rgba(74,122,78,0.12)] text-[#2E5C33]"
-                      : "bg-muted text-muted-foreground"
+                      : "bg-[#f5f5f5] text-[#757575]"
                   }`}
                 >
                   {present ? "✓" : "−"} {getFieldRoleLabel(role)}
@@ -1328,11 +1122,11 @@ function PreviewPane({
   isLoading?: boolean
 }) {
   return (
-    <div className="rounded-[12px] border border-border bg-background/60 p-4">
+    <div className=" border-2 border-black bg-white p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-[15px] font-medium text-foreground">{title}</p>
+        <p className="text-[15px] font-medium text-[#1a1a1a]">{title}</p>
         <span
-          className="rounded-[6px] border border-border bg-muted px-2 py-0.5 font-mono text-[11px] text-muted-foreground"
+          className=" border-2 border-black bg-[#f5f5f5] px-2 py-0.5 font-mono text-[11px] text-[#757575]"
           data-changed={changed}
         >
           {isLoading ? "computing…" : changed ? "changed" : "unchanged"}
@@ -1356,27 +1150,27 @@ function PreviewPane({
 
 function FieldDiffPanel({ diffs }: { diffs: FieldDiff[] }) {
   return (
-    <div className="mt-4 rounded-[12px] border border-border bg-background/60 p-4">
+    <div className="mt-4 border-2 border-black bg-white p-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[15px] font-medium text-foreground">Diff summary</p>
-        <span className="rounded-[6px] border border-border bg-muted px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+        <p className="text-[15px] font-medium text-[#1a1a1a]">Diff summary</p>
+        <span className=" border-2 border-black bg-[#f5f5f5] px-2 py-0.5 font-mono text-[11px] text-[#757575]">
           {diffs.length} fields
         </span>
       </div>
       {diffs.length === 0 ? (
-        <p className="mt-3 text-[14px] text-muted-foreground">
+        <p className="mt-3 text-[14px] text-[#757575]">
           No field changes in the current preview transform.
         </p>
       ) : (
         <div className="mt-3 space-y-3">
           {diffs.map((diff) => (
-            <div key={diff.name} className="rounded-[8px] border border-border bg-card p-3">
+            <div key={diff.name} className=" border-2 border-black bg-white p-3">
               <div className="flex items-center gap-2">
-                <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#757575]">
                   {diff.name}
                 </p>
                 {diff.moved && (
-                  <span className="rounded-[999px] bg-[rgba(184,135,58,0.12)] px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.04em] text-[#8A6528]">
+                  <span className=" bg-[rgba(184,135,58,0.12)] px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.04em] text-[#8A6528]">
                     reordered
                   </span>
                 )}
@@ -1404,13 +1198,13 @@ function DiffValue({
 }) {
   return (
     <div
-      className="rounded-[6px] border px-3 py-2"
+      className=" border px-3 py-2"
       data-tone={tone}
     >
-      <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+      <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#757575]">
         {label}
       </p>
-      <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-[13px] text-foreground">
+      <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-[13px] text-[#1a1a1a]">
         {value || "(empty)"}
       </p>
     </div>
@@ -1427,20 +1221,20 @@ function PreviewFrame({
   isLoading?: boolean
 }) {
   return (
-    <div className="overflow-hidden rounded-[12px] border border-border bg-background">
-      <div className="border-b border-border px-4 py-2 font-mono text-[12px] font-medium text-muted-foreground">
+    <div className="overflow-hidden border-2 border-black bg-white">
+      <div className="border-b border-border px-4 py-2 font-mono text-[12px] font-medium text-[#757575]">
         {title}
       </div>
       {isLoading ? (
-        <div className="flex h-64 items-center justify-center bg-background">
-          <LoaderCircle className="size-5 animate-spin text-muted-foreground" />
+        <div className="flex h-64 items-center justify-center bg-white">
+          <LoaderCircle className="size-5 animate-spin text-[#757575]" />
         </div>
       ) : (
         <iframe
           title={`${title} card preview`}
           sandbox=""
           srcDoc={html}
-          className="h-64 w-full bg-background"
+          className="h-64 w-full bg-white"
         />
       )}
     </div>

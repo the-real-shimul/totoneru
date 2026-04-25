@@ -96,7 +96,7 @@ export function BlockEditor({
           {issues.map((issue, i) => (
             <div
               key={i}
-              className={`rounded-[6px] px-3 py-2 text-[12px] ${
+              className={` px-3 py-2 text-[12px] ${
                 issue.severity === "error"
                   ? "bg-[rgba(217,58,38,0.10)] text-[#A8321A]"
                   : "bg-[rgba(184,135,58,0.12)] text-[#8A6528]"
@@ -121,21 +121,21 @@ export function BlockEditor({
                 }
                 setDraggedIndex(null)
               }}
-              className={`flex items-center gap-2 rounded-[8px] border px-3 py-2.5 transition-colors ${
+              className={`flex items-center gap-2  border px-3 py-2.5 transition-colors ${
                 block.visible
-                  ? "border-border bg-background/60"
-                  : "border-border bg-muted/40 opacity-60"
+                  ? "border-border bg-white"
+                  : "border-border bg-[#f5f5f5] opacity-60"
               }`}
             >
               <button
                 type="button"
-                className="cursor-grab text-muted-foreground hover:text-foreground"
+                className="cursor-grab text-[#757575] hover:text-[#1a1a1a]"
                 aria-label="Drag to reorder"
               >
                 <GripVertical className="size-4" />
               </button>
 
-              <span className="text-[14px] font-medium text-foreground flex-1">
+              <span className="text-[14px] font-medium text-[#1a1a1a] flex-1">
                 {getFieldRoleLabel(block.role)}
               </span>
 
@@ -144,7 +144,7 @@ export function BlockEditor({
                   type="button"
                   onClick={() => handleMove(index, Math.max(0, index - 1))}
                   disabled={index === 0}
-                  className="rounded-[6px] p-1.5 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                  className=" p-1.5 text-[#757575] hover:text-[#1a1a1a] transition-colors disabled:opacity-30 disabled:pointer-events-none"
                   aria-label={`Move ${getFieldRoleLabel(block.role)} up`}
                   title="Move up"
                 >
@@ -154,7 +154,7 @@ export function BlockEditor({
                   type="button"
                   onClick={() => handleMove(index, Math.min(layout.blocks.length - 1, index + 1))}
                   disabled={index === layout.blocks.length - 1}
-                  className="rounded-[6px] p-1.5 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                  className=" p-1.5 text-[#757575] hover:text-[#1a1a1a] transition-colors disabled:opacity-30 disabled:pointer-events-none"
                   aria-label={`Move ${getFieldRoleLabel(block.role)} down`}
                   title="Move down"
                 >
@@ -165,7 +165,7 @@ export function BlockEditor({
               <button
                 type="button"
                 onClick={() => handleToggleVisible(block.role)}
-                className="rounded-[6px] p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                className=" p-1.5 text-[#757575] hover:text-[#1a1a1a] transition-colors"
                 aria-label={block.visible ? "Hide block" : "Show block"}
               >
                 {block.visible ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
@@ -176,10 +176,10 @@ export function BlockEditor({
                 onClick={() =>
                   setEditingBlock(editingBlock === block.role ? null : block.role)
                 }
-                className={`rounded-[6px] p-1.5 transition-colors ${
+                className={` p-1.5 transition-colors ${
                   editingBlock === block.role
-                    ? "text-foreground bg-muted"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "text-[#1a1a1a] bg-[#f5f5f5]"
+                    : "text-[#757575] hover:text-[#1a1a1a]"
                 }`}
                 aria-label="Edit block settings"
               >
@@ -214,9 +214,9 @@ function BlockSettingsPanel({
   onUpdateDelay: (role: FieldRole, delayMs: number) => void
 }) {
   return (
-    <div className="mt-1 ml-6 rounded-[8px] border border-border bg-background/60 p-4 space-y-3">
+    <div className="mt-1 ml-6 border-2 border-black bg-white p-4 space-y-3">
       <div>
-        <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1">
+        <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#757575] mb-1">
           Font size
         </p>
         <div className="flex flex-wrap gap-1">
@@ -225,10 +225,10 @@ function BlockSettingsPanel({
               key={size}
               type="button"
               onClick={() => onUpdateStyle(block.role, { fontSize: size })}
-              className={`rounded-[6px] px-2.5 py-1 text-[13px] ${
+              className={` px-2.5 py-1 text-[13px] ${
                 block.style.fontSize === size
                   ? "bg-foreground text-background"
-                  : "bg-muted text-foreground hover:bg-muted/80"
+                  : "bg-[#f5f5f5] text-[#1a1a1a] hover:bg-[#e5e5e5]"
               }`}
             >
               {size}px
@@ -237,10 +237,10 @@ function BlockSettingsPanel({
           <button
             type="button"
             onClick={() => onUpdateStyle(block.role, { fontSize: undefined })}
-            className={`rounded-[6px] px-2.5 py-1 text-[13px] ${
+            className={` px-2.5 py-1 text-[13px] ${
               !block.style.fontSize
                 ? "bg-foreground text-background"
-                : "bg-muted text-foreground hover:bg-muted/80"
+                : "bg-[#f5f5f5] text-[#1a1a1a] hover:bg-[#e5e5e5]"
             }`}
           >
             Default
@@ -249,28 +249,28 @@ function BlockSettingsPanel({
       </div>
 
       <div>
-        <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1">
+        <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#757575] mb-1">
           Style
         </p>
-        <label className="flex items-center gap-2 text-[14px] text-foreground cursor-pointer">
+        <label className="flex items-center gap-2 text-[14px] text-[#1a1a1a] cursor-pointer">
           <input
             type="checkbox"
             checked={!!block.style.emphasis}
             onChange={(e) => onUpdateStyle(block.role, { emphasis: e.target.checked })}
-            className="size-4 accent-foreground"
+            className="size-4 accent-black"
           />
           Bold
         </label>
       </div>
 
       <div>
-        <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1">
+        <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#757575] mb-1">
           Reveal mode
         </p>
         <select
           value={block.behavior.revealMode}
           onChange={(e) => onUpdateReveal(block.role, e.target.value as RevealMode)}
-          className="w-full rounded-[8px] border border-border bg-background px-3 py-2 text-[14px] text-foreground outline-none"
+          className="w-full border-2 border-black bg-white px-3 py-2 text-[14px] text-[#1a1a1a] outline-none"
         >
           {(Object.keys(REVEAL_MODE_LABELS) as RevealMode[]).map((mode) => (
             <option key={mode} value={mode}>
@@ -282,7 +282,7 @@ function BlockSettingsPanel({
 
       {block.behavior.revealMode === "delay" && (
         <div>
-          <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1">
+          <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#757575] mb-1">
             Delay (ms)
           </p>
           <input
@@ -292,7 +292,7 @@ function BlockSettingsPanel({
             step={100}
             value={block.behavior.delayMs ?? 1000}
             onChange={(e) => onUpdateDelay(block.role, Number(e.target.value))}
-            className="w-full rounded-[8px] border border-border bg-background px-3 py-2 text-[14px] text-foreground outline-none"
+            className="w-full border-2 border-black bg-white px-3 py-2 text-[14px] text-[#1a1a1a] outline-none"
           />
         </div>
       )}

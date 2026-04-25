@@ -1,7 +1,6 @@
 import localFont from "next/font/local"
 
 import "./globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
 import { AnalyticsProvider } from "@/components/analytics-provider"
 import { cn } from "@/lib/utils"
 
@@ -34,7 +33,6 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      suppressHydrationWarning
       className={cn(
         "font-sans antialiased",
         fontMono.variable,
@@ -43,9 +41,7 @@ export default function RootLayout({
       )}
     >
       <body className="min-h-svh bg-background text-foreground">
-        <ThemeProvider>
-          <AnalyticsProvider>{children}</AnalyticsProvider>
-        </ThemeProvider>
+        <AnalyticsProvider>{children}</AnalyticsProvider>
       </body>
     </html>
   )
