@@ -8,7 +8,7 @@
 
 **Phase:** 10 — Public Launch  
 **Next session target:** Execute launch posts, monitor Sentry, enable GitHub Discussions  
-**Last updated:** 2026-04-25
+**Last updated:** 2026-04-26
 
 ---
 
@@ -237,6 +237,14 @@
 - **App shell:** `app/page.tsx` now provides the initial marketing/workspace shell with header, workflow nav pills, hero area, staged workflow sidebar, and footer.
 - **Theme control:** `components/theme-toggle.tsx` added for a visible dark mode toggle in the header. Existing `d` keyboard shortcut remains available via `components/theme-provider.tsx`.
 - **Foundation cleanup:** `components/analytics-provider.tsx` consent initialization changed to a lazy state initializer to satisfy lint rules; `app/layout.tsx` unused import removed and body-level shell classes added.
+
+### UI iteration implementation notes
+
+- **Two reviewable directions:** Added `/iterations/a` and `/iterations/b`, each with a landing page plus Import, Add Cards, AI, Batch, and Export pages.
+- **Editorial system:** Shared iteration shell uses WIRED-inspired square rules, mono labels, dense grids, black/white surfaces, and reduced-motion-safe editorial animations.
+- **Documentation toggle:** Each iteration page has a global documentation toggle wired to the existing help-doc copy.
+- **Manual card creation:** Added UI for creating cards directly in IndexedDB, editing generated fields, selecting standalone/deck-merge targets, and optional BYO-key AI fill.
+- **Export expansion:** Added manual-card standalone APKG, UTF-8 CSV, UTF-8 TSV, original APKG, and transformed APKG export options. Deck-merge manual cards are inserted only into the exported copy.
 
 ### Pending setup (needs human action)
 

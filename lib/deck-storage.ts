@@ -11,12 +11,13 @@ type DeckBackupRecord = {
 }
 
 const DATABASE_NAME = "totoneru"
-const DATABASE_VERSION = 4
+const DATABASE_VERSION = 5
 const BACKUP_STORE = "backups"
 const DECK_STORE = "decks"
 const KEY_STORE = "keys"
 const BATCH_STORE = "batches"
 const STAGED_STORE = "staged"
+const MANUAL_WORD_STORE = "manualWords"
 
 export async function getDatabase() {
   return openDB(DATABASE_NAME, DATABASE_VERSION, {
@@ -37,6 +38,9 @@ export async function getDatabase() {
         if (!database.objectStoreNames.contains(STAGED_STORE)) {
           database.createObjectStore(STAGED_STORE, { keyPath: "deckId" })
         }
+      }
+      if (!database.objectStoreNames.contains(MANUAL_WORD_STORE)) {
+        database.createObjectStore(MANUAL_WORD_STORE, { keyPath: "id" })
       }
     },
   })
