@@ -4,7 +4,6 @@ import { BookOpen, LoaderCircle, Trash2 } from "lucide-react"
 import { useId, useState } from "react"
 
 import { Button } from "@/components/ui/button"
-import type { ActiveDeck } from "@/lib/deck-model"
 import {
   createBrowserStore,
   useBrowserStore,
@@ -32,11 +31,9 @@ const userPromptsStore = createBrowserStore<UserPrompt[]>({
 })
 
 export function PromptLibrary({
-  activeDeck,
   onSelectPrompt,
   selectedPromptId,
 }: {
-  activeDeck: ActiveDeck
   onSelectPrompt: (prompt: UserPrompt | null) => void
   selectedPromptId: string | null
 }) {

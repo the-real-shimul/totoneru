@@ -72,7 +72,6 @@ export function AiToolPage({ iteration = "a" }: { iteration?: IterationId }) {
             {activeDeck ? (
               <div className="space-y-4">
                 <PromptLibrary
-                  activeDeck={activeDeck}
                   selectedPromptId={selectedPrompt?.id ?? null}
                   onSelectPrompt={setSelectedPrompt}
                 />
