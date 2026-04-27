@@ -19,10 +19,17 @@ export function EditorialSection({
     <section className={cn("border-t-2 border-black py-8", className)}>
       <div className="mb-5 flex items-end justify-between gap-4">
         <div>
-          <p className="font-mono text-[12px] font-bold uppercase tracking-[0.14em] text-[#757575]">
-            {eyebrow}
-          </p>
-          <h2 className="mt-1 text-[28px] font-black leading-[1.02] tracking-[-0.02em] sm:text-[38px]">
+          {eyebrow && (
+            <p className="font-mono text-[12px] font-bold uppercase tracking-[0.12em] text-[#757575]">
+              {eyebrow}
+            </p>
+          )}
+          <h2
+            className={cn(
+              "text-[28px] font-black leading-[1.02] tracking-[-0.02em] sm:text-[38px]",
+              eyebrow && "mt-1"
+            )}
+          >
             {title}
           </h2>
         </div>

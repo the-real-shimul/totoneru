@@ -130,6 +130,7 @@ async function applyAiPromptToNote({
         endpoint: key.endpoint,
         apiKey: key.apiKey,
         model: key.model,
+        provider: key.provider,
       },
     })
   )

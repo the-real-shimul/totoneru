@@ -4,13 +4,36 @@ import initSqlJs from "sql.js/dist/sql-wasm.js"
 
 import { computeCsum } from "@/lib/anki-checksum"
 import type { ActiveDeck } from "@/lib/deck-model"
-import { applyTemplateTransform } from "@/lib/templates"
+import {
+  applyTemplateTransform,
+  getExpressionFocusedAnkiTemplate,
+  getExpressionFocusedMissingRoles,
+} from "@/lib/templates"
 import { applyTransformations } from "@/lib/transformations"
 import type { TransformationConfig } from "@/lib/transformations"
 import type { BatchResult } from "@/lib/batch-operations"
 import type { ManualWord } from "@/lib/manual-words"
+import type { FieldRole } from "@/lib/schema-mapping"
 
 const FIELD_SEPARATOR = "\u001f"
+
+type AnkiTemplateJson = {
+  name?: string
+  qfmt?: string
+  afmt?: string
+  bqfmt?: string
+  bafmt?: string
+}
+
+type AnkiModelJson = {
+  id?: number | string
+  name?: string
+  mod?: number
+  css?: string
+  tmpls?: AnkiTemplateJson[]
+}
+
+type ConfigReplacement = Record<number, string>
 
 export type ExportConfig = {
   activeDeck: ActiveDeck
@@ -109,6 +132,164 @@ function createGuid() {
   }
 
   return guid
+}
+
+function readVarint(bytes: Uint8Array, offset: number) {
+  let result = 0
+  let shift = 0
+  let cursor = offset
+
+  while (cursor < bytes.length) {
+    const byte = bytes[cursor]
+    result |= (byte & 0x7f) << shift
+    cursor += 1
+
+    if ((byte & 0x80) === 0) {
+      return { value: result, offset: cursor }
+    }
+
+    shift += 7
+  }
+
+  return null
+}
+
+function writeVarint(value: number) {
+  const bytes: number[] = []
+  let current = value
+
+  while (current >= 0x80) {
+    bytes.push((current & 0x7f) | 0x80)
+    current >>>= 7
+  }
+
+  bytes.push(current)
+  return bytes
+}
+
+function pushBytes(target: number[], bytes: Uint8Array | number[]) {
+  for (const byte of bytes) {
+    target.push(byte)
+  }
+}
+
+function skipProtoValue(bytes: Uint8Array, offset: number, wireType: number) {
+  if (wireType === 0) {
+    return readVarint(bytes, offset)?.offset ?? null
+  }
+
+  if (wireType === 1) {
+    return offset + 8 <= bytes.length ? offset + 8 : null
+  }
+
+  if (wireType === 2) {
+    const length = readVarint(bytes, offset)
+    if (!length) return null
+    const end = length.offset + length.value
+    return end <= bytes.length ? end : null
+  }
+
+  if (wireType === 5) {
+    return offset + 4 <= bytes.length ? offset + 4 : null
+  }
+
+  return null
+}
+
+function replaceLengthDelimitedConfigFields(config: Uint8Array, replacements: ConfigReplacement) {
+  const output: number[] = []
+  const seen = new Set<number>()
+  const encoder = new TextEncoder()
+  let offset = 0
+
+  while (offset < config.length) {
+    const start = offset
+    const tag = readVarint(config, offset)
+
+    if (!tag) {
+      pushBytes(output, config.slice(start))
+      break
+    }
+
+    offset = tag.offset
+    const fieldNumber = tag.value >> 3
+    const wireType = tag.value & 0x07
+    const end = skipProtoValue(config, offset, wireType)
+
+    if (end === null) {
+      pushBytes(output, config.slice(start))
+      break
+    }
+
+    const replacement = replacements[fieldNumber]
+    if (wireType === 2 && replacement !== undefined) {
+      const replacementBytes = encoder.encode(replacement)
+      pushBytes(output, writeVarint((fieldNumber << 3) | 2))
+      pushBytes(output, writeVarint(replacementBytes.length))
+      pushBytes(output, replacementBytes)
+      seen.add(fieldNumber)
+    } else {
+      pushBytes(output, config.slice(start, end))
+    }
+
+    offset = end
+  }
+
+  for (const [fieldNumber, replacement] of Object.entries(replacements)) {
+    const numericField = Number(fieldNumber)
+    if (seen.has(numericField)) continue
+
+    const replacementBytes = encoder.encode(replacement)
+    pushBytes(output, writeVarint((numericField << 3) | 2))
+    pushBytes(output, writeVarint(replacementBytes.length))
+    pushBytes(output, replacementBytes)
+  }
+
+  return new Uint8Array(output)
+}
+
+function readLengthDelimitedConfigField(config: Uint8Array, targetField: number) {
+  const decoder = new TextDecoder()
+  let offset = 0
+
+  while (offset < config.length) {
+    const tag = readVarint(config, offset)
+    if (!tag) break
+    offset = tag.offset
+
+    const fieldNumber = tag.value >> 3
+    const wireType = tag.value & 0x07
+
+    if (wireType !== 2) {
+      const end = skipProtoValue(config, offset, wireType)
+      if (end === null) break
+      offset = end
+      continue
+    }
+
+    const length = readVarint(config, offset)
+    if (!length) break
+    offset = length.offset
+    const end = offset + length.value
+    if (end > config.length) break
+
+    if (fieldNumber === targetField) {
+      return decoder.decode(config.slice(offset, end))
+    }
+
+    offset = end
+  }
+
+  return ""
+}
+
+function tableExists(db: initSqlJs.Database, tableName: string) {
+  const escaped = tableName.replaceAll("'", "''")
+  const result = db.exec(
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name = '${escaped}' LIMIT 1`
+  )
+
+  return (result[0]?.values.length ?? 0) > 0
 }
 
 function getExpressionFieldIndex(activeDeck: ActiveDeck, noteTypeId: string) {
@@ -211,6 +392,259 @@ async function insertManualWordsIntoImportedDeck(
   return { addedNotes: words.length, addedCards }
 }
 
+function getExpressionFocusedTemplateForMapping(
+  activeDeck: ActiveDeck,
+  mapping: ActiveDeck["noteTypeMappings"][number]
+) {
+  const noteType = activeDeck.deck.noteTypes.find((candidate) => candidate.id === mapping.noteTypeId)
+
+  if (!noteType) {
+    throw new Error(
+      `Expression Focused export could not find the Anki note type model for ${mapping.noteTypeId}.`
+    )
+  }
+
+  const focusedTemplate = getExpressionFocusedAnkiTemplate({
+    noteType,
+    fieldMappings: mapping.fieldMappings as Record<string, FieldRole>,
+  })
+
+  if (!focusedTemplate) {
+    throw new Error(
+      `Expression Focused requires mapped fields for ${noteType.name}: ${getExpressionFocusedMissingRoles(mapping.fieldMappings).join(", ")}.`
+    )
+  }
+
+  return { noteType, focusedTemplate }
+}
+
+function rewriteExpressionFocusedModelJson({
+  db,
+  activeDeck,
+  now,
+  expressionFocusedMappings,
+}: {
+  db: initSqlJs.Database
+  activeDeck: ActiveDeck
+  now: number
+  expressionFocusedMappings: ActiveDeck["noteTypeMappings"]
+}) {
+  const modelsRow = db.exec("SELECT models FROM col LIMIT 1")
+  const rawModels = String(modelsRow[0]?.values?.[0]?.[0] ?? "")
+
+  if (rawModels.trim().length <= 2) {
+    return false
+  }
+
+  const models = JSON.parse(rawModels) as Record<string, AnkiModelJson>
+
+  for (const mapping of expressionFocusedMappings) {
+    const { noteType, focusedTemplate } = getExpressionFocusedTemplateForMapping(activeDeck, mapping)
+    const model = models[mapping.noteTypeId]
+
+    if (!model) {
+      throw new Error(
+        `Expression Focused export could not find the Anki note type model for ${mapping.noteTypeId}.`
+      )
+    }
+
+    if (!model.tmpls || model.tmpls.length === 0) {
+      throw new Error(
+        `Expression Focused export requires at least one card template on ${noteType.name}.`
+      )
+    }
+
+    model.css = focusedTemplate.css
+    model.mod = now
+    model.tmpls[0] = {
+      ...model.tmpls[0],
+      name: focusedTemplate.name,
+      qfmt: focusedTemplate.front,
+      afmt: focusedTemplate.back,
+      bqfmt: "",
+      bafmt: "",
+    }
+  }
+
+  db.run("UPDATE col SET models = ?, mod = ?, scm = ? WHERE id = (SELECT id FROM col LIMIT 1)", [
+    JSON.stringify(models),
+    now,
+    Date.now(),
+  ])
+
+  return true
+}
+
+function rewriteExpressionFocusedNormalizedModels({
+  db,
+  activeDeck,
+  now,
+  expressionFocusedMappings,
+}: {
+  db: initSqlJs.Database
+  activeDeck: ActiveDeck
+  now: number
+  expressionFocusedMappings: ActiveDeck["noteTypeMappings"]
+}) {
+  if (!tableExists(db, "templates") || !tableExists(db, "notetypes")) {
+    return false
+  }
+
+  let changed = false
+
+  for (const mapping of expressionFocusedMappings) {
+    const noteTypeId = Number(mapping.noteTypeId)
+    if (!Number.isFinite(noteTypeId)) {
+      throw new Error(
+        `Expression Focused export could not rewrite non-numeric note type ${mapping.noteTypeId}.`
+      )
+    }
+
+    const { noteType, focusedTemplate } = getExpressionFocusedTemplateForMapping(activeDeck, mapping)
+    const templateRows = db.exec(
+      `SELECT config FROM templates WHERE ntid = ${noteTypeId} AND ord = 0 LIMIT 1`
+    )
+    const templateConfig = templateRows[0]?.values?.[0]?.[0]
+
+    if (!(templateConfig instanceof Uint8Array)) {
+      throw new Error(
+        `Expression Focused export requires at least one card template on ${noteType.name}.`
+      )
+    }
+
+    const nextTemplateConfig = replaceLengthDelimitedConfigFields(templateConfig, {
+      1: focusedTemplate.front,
+      2: focusedTemplate.back,
+    })
+
+    db.run("UPDATE templates SET mtime_secs = ?, usn = ?, config = ? WHERE ntid = ? AND ord = 0", [
+      now,
+      -1,
+      nextTemplateConfig,
+      noteTypeId,
+    ])
+
+    const noteTypeRows = db.exec(`SELECT config FROM notetypes WHERE id = ${noteTypeId} LIMIT 1`)
+    const noteTypeConfig = noteTypeRows[0]?.values?.[0]?.[0]
+
+    if (!(noteTypeConfig instanceof Uint8Array)) {
+      throw new Error(
+        `Expression Focused export could not find editable styling config for ${noteType.name}.`
+      )
+    }
+
+    const nextNoteTypeConfig = replaceLengthDelimitedConfigFields(noteTypeConfig, {
+      3: focusedTemplate.css,
+    })
+
+    db.run("UPDATE notetypes SET mtime_secs = ?, usn = ?, config = ? WHERE id = ?", [
+      now,
+      -1,
+      nextNoteTypeConfig,
+      noteTypeId,
+    ])
+    changed = true
+  }
+
+  if (changed) {
+    db.run("UPDATE col SET mod = ?, scm = ? WHERE id = (SELECT id FROM col LIMIT 1)", [
+      now,
+      Date.now(),
+    ])
+  }
+
+  return changed
+}
+
+function rewriteExpressionFocusedModels({
+  db,
+  activeDeck,
+  now,
+}: {
+  db: initSqlJs.Database
+  activeDeck: ActiveDeck
+  now: number
+}) {
+  const expressionFocusedMappings = activeDeck.noteTypeMappings.filter(
+    (mapping) => mapping.templateSelection === "expressionFocused"
+  )
+
+  if (expressionFocusedMappings.length === 0) {
+    return false
+  }
+
+  if (
+    rewriteExpressionFocusedModelJson({
+      db,
+      activeDeck,
+      now,
+      expressionFocusedMappings,
+    })
+  ) {
+    return true
+  }
+
+  if (
+    rewriteExpressionFocusedNormalizedModels({
+      db,
+      activeDeck,
+      now,
+      expressionFocusedMappings,
+    })
+  ) {
+    return true
+  }
+
+  throw new Error(
+    "Expression Focused export could not find editable Anki model JSON or normalized template tables."
+  )
+}
+
+function verifyExpressionFocusedModels(db: initSqlJs.Database, activeDeck: ActiveDeck) {
+  const expressionFocusedMappings = activeDeck.noteTypeMappings.filter(
+    (mapping) => mapping.templateSelection === "expressionFocused"
+  )
+
+  if (expressionFocusedMappings.length === 0) {
+    return true
+  }
+
+  const verifyModelsRow = db.exec("SELECT models FROM col LIMIT 1")
+  const rawModels = String(verifyModelsRow[0]?.values?.[0]?.[0] ?? "")
+
+  if (rawModels.trim().length > 2) {
+    const verifyModels = JSON.parse(rawModels) as Record<string, AnkiModelJson>
+    return expressionFocusedMappings.every(
+      (mapping) => verifyModels[mapping.noteTypeId]?.tmpls?.[0]?.name === "Expression Focused"
+    )
+  }
+
+  if (!tableExists(db, "templates") || !tableExists(db, "notetypes")) {
+    return false
+  }
+
+  return expressionFocusedMappings.every((mapping) => {
+    const noteTypeId = Number(mapping.noteTypeId)
+    if (!Number.isFinite(noteTypeId)) return false
+
+    const templateRows = db.exec(
+      `SELECT config FROM templates WHERE ntid = ${noteTypeId} AND ord = 0 LIMIT 1`
+    )
+    const noteTypeRows = db.exec(`SELECT config FROM notetypes WHERE id = ${noteTypeId} LIMIT 1`)
+    const templateConfig = templateRows[0]?.values?.[0]?.[0]
+    const noteTypeConfig = noteTypeRows[0]?.values?.[0]?.[0]
+    const focusedTemplate = getExpressionFocusedTemplateForMapping(activeDeck, mapping).focusedTemplate
+
+    return (
+      templateConfig instanceof Uint8Array &&
+      noteTypeConfig instanceof Uint8Array &&
+      readLengthDelimitedConfigField(templateConfig, 1) === focusedTemplate.front &&
+      readLengthDelimitedConfigField(templateConfig, 2) === focusedTemplate.back &&
+      readLengthDelimitedConfigField(noteTypeConfig, 3) === focusedTemplate.css
+    )
+  })
+}
+
 export async function buildTransformedApkg(
   originalBuffer: ArrayBuffer,
   config: ExportConfig
@@ -258,6 +692,12 @@ export async function buildTransformedApkg(
       const mappingByNoteTypeId = new Map(
         config.activeDeck.noteTypeMappings.map((m) => [m.noteTypeId, m])
       )
+      const now = Math.floor(Date.now() / 1000)
+      const modelTemplatesChanged = rewriteExpressionFocusedModels({
+        db,
+        activeDeck: config.activeDeck,
+        now,
+      })
 
       const notesResult = db.exec(
         "SELECT id, mid, flds FROM notes ORDER BY id"
@@ -271,7 +711,6 @@ export async function buildTransformedApkg(
 
       let changedCount = 0
       let unchangedCount = 0
-      const now = Math.floor(Date.now() / 1000)
 
       for (const [id, mid, rawFlds] of noteRows) {
         const noteType = noteTypeById.get(String(mid))
@@ -366,7 +805,11 @@ export async function buildTransformedApkg(
         const verifyDb = new SQL.Database(verifyCollectionBytes)
         const verifyResult = verifyDb.exec("SELECT count(*) FROM notes")
         if (verifyResult.length > 0) {
-          verified = true
+          if (modelTemplatesChanged) {
+            verified = verifyExpressionFocusedModels(verifyDb, config.activeDeck)
+          } else {
+            verified = true
+          }
         }
         verifyDb.close()
       } catch {

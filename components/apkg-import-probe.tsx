@@ -1,15 +1,16 @@
 "use client"
 
-import { ChevronLeft, ChevronRight, LoaderCircle, Upload, X } from "lucide-react"
-import { useCallback, useId, useMemo, useRef, useState, useTransition, useEffect } from "react"
+import { ChevronDown, ChevronLeft, ChevronRight, LoaderCircle, Upload, X } from "lucide-react"
+import Link from "next/link"
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 
 import { Button } from "@/components/ui/button"
+import { saveOriginalDeckBackup, saveActiveDeck, loadMostRecentActiveDeck, deleteActiveDeck, deleteBackup, deleteAllStaleDeckRecords } from "@/lib/deck-storage"
 import {
   createPreviewDocument,
   getFirstRenderableTemplate,
   renderAnkiTemplate,
 } from "@/lib/anki-template-renderer"
-import { saveOriginalDeckBackup, saveActiveDeck, loadMostRecentActiveDeck, deleteActiveDeck, deleteBackup, deleteAllStaleDeckRecords } from "@/lib/deck-storage"
 import type {
   ApkgParserRequest,
   ApkgParserResponse,
@@ -24,8 +25,6 @@ import {
   type FieldRoleSuggestion,
 } from "@/lib/schema-mapping"
 import {
-  applyTemplateTransform,
-  computeTemplateDiffs,
   getBestTemplateMatch,
   getTemplatePreviewStyles,
   renderTemplatePreviewHtml,
@@ -39,21 +38,6 @@ import {
   updateTemplateSelection,
   type ActiveDeck,
 } from "@/lib/deck-model"
-import {
-  applyTransformations,
-  DEFAULT_TRANSFORMATIONS,
-  type TransformationConfig,
-  type TransformationType,
-} from "@/lib/transformations"
-import { BlockEditor, generatePreviewWithBlocks } from "@/components/block-editor"
-import type { LayoutConfig } from "@/lib/block-editor"
-
-type FieldDiff = {
-  name: string
-  before: string
-  after: string
-  moved?: boolean
-}
 
 type ProbeState =
   | { status: "loading" }
@@ -73,6 +57,7 @@ const fieldRoleOptions: FieldRole[] = [
 ]
 
 const EMPTY_FIELD_MAPPINGS: Record<string, FieldRole> = {}
+const INPUT_ID = "apkg-import-input"
 
 function parseApkgInWorker(file: File, buffer: ArrayBuffer) {
   return new Promise<ParsedDeckSummary>((resolve, reject) => {
@@ -106,7 +91,6 @@ function parseApkgInWorker(file: File, buffer: ArrayBuffer) {
 }
 
 export function ApkgImportProbe() {
-  const inputId = useId()
   const inputRef = useRef<HTMLInputElement | null>(null)
   const [result, setResult] = useState<ProbeState>({ status: "loading" })
   const [isPending, startTransition] = useTransition()
@@ -167,104 +151,78 @@ export function ApkgImportProbe() {
 
   return (
     <div className="space-y-5">
-      {/* Upload card */}
-      <div className=" border-2 border-black bg-white p-10 ">
-        <input
-          ref={inputRef}
-          id={inputId}
-          type="file"
-          accept=".apkg,application/octet-stream"
-          className="sr-only"
-          onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)}
-        />
+      <input
+        ref={inputRef}
+        id={INPUT_ID}
+        type="file"
+        accept=".apkg,application/octet-stream"
+        className="sr-only"
+        onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)}
+      />
 
-        {result.status === "loading" && (
-          <div className="flex items-center gap-3 py-6 text-muted-foreground">
-            <LoaderCircle className="animate-spin size-5" />
-            <span className="text-[14px]">Restoring workspace…</span>
-          </div>
-        )}
-
-        {result.status === "idle" && (
-          <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-2">
-              <p className="text-[20px] font-medium text-[#1a1a1a]">Choose a deck to import</p>
-              <p className="text-[15px] leading-[1.55] text-[#4A4744]">
-                Reads notes, note types, templates, and media manifest entirely in the browser.
-                Nothing is uploaded.
-              </p>
+      {result.status !== "success" && (
+        <div className="border-2 border-black bg-white p-10">
+          {result.status === "loading" && (
+            <div className="flex items-center gap-3 py-6 text-muted-foreground">
+              <LoaderCircle className="animate-spin size-5" />
+              <span className="text-[14px]">Restoring workspace…</span>
             </div>
-            <Button
-              type="button"
-              size="lg"
-              className="shrink-0"
-              onClick={() => document.getElementById(inputId)?.click()}
-              disabled={isPending}
-            >
-              {isPending ? <LoaderCircle className="animate-spin" /> : <Upload />}
-              {isPending ? "Reading deck…" : "Choose .apkg"}
-            </Button>
-          </div>
-        )}
+          )}
 
-        {result.status === "error" && (
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-2">
-              <p className="text-[15px] font-medium text-[#A8321A]">Import failed</p>
-              <p className="text-[15px] leading-[1.55] text-[#4A4744]">{result.message}</p>
-            </div>
-            <Button
-              type="button"
-              size="lg"
-              className="shrink-0"
-              onClick={() => {
-                setResult({ status: "idle" })
-                document.getElementById(inputId)?.click()
-              }}
-            >
-              <Upload />
-              Try again
-            </Button>
-          </div>
-        )}
-
-        {result.status === "success" && (
-          <div className="flex items-center justify-between gap-6">
-            <div className="space-y-1">
-              <p className="text-[15px] font-medium text-[#1a1a1a]">{result.activeDeck.fileName}</p>
-              <p className="font-mono text-[12px] text-[#757575]">
-                Active workspace · {Math.round(result.activeDeck.fileSize / 1024)} KB ·{" "}
-                {new Date(result.activeDeck.importedAt).toLocaleString()}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
+          {result.status === "idle" && (
+            <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-2">
+                <p className="text-[20px] font-medium text-[#1a1a1a]">Choose a deck to import</p>
+                <p className="text-[15px] leading-[1.55] text-[#4A4744]">
+                  Reads notes, note types, templates, and media manifest entirely in the browser.
+                  Nothing is uploaded.
+                </p>
+              </div>
               <Button
                 type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleClearWorkspace}
-              >
-                <X />
-                Clear
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => document.getElementById(inputId)?.click()}
+                size="lg"
+                className="shrink-0"
+                onClick={() => document.getElementById(INPUT_ID)?.click()}
                 disabled={isPending}
               >
                 {isPending ? <LoaderCircle className="animate-spin" /> : <Upload />}
-                Replace
+                {isPending ? "Reading deck…" : "Choose .apkg"}
               </Button>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+
+          {result.status === "error" && (
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-2">
+                <p className="text-[15px] font-medium text-[#A8321A]">Import failed</p>
+                <p className="text-[15px] leading-[1.55] text-[#4A4744]">{result.message}</p>
+              </div>
+              <Button
+                type="button"
+                size="lg"
+                className="shrink-0"
+                onClick={() => {
+                  setResult({ status: "idle" })
+                  document.getElementById(INPUT_ID)?.click()
+                }}
+              >
+                <Upload />
+                Try again
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Results — only shown after successful import */}
       {result.status === "success" && (
-        <DeckResults activeDeck={result.activeDeck} />
+        <DeckResults
+          key={result.activeDeck.id}
+          activeDeck={result.activeDeck}
+          isReplacing={isPending}
+          onClearWorkspace={handleClearWorkspace}
+          onReplaceDeck={() => document.getElementById(INPUT_ID)?.click()}
+        />
       )}
     </div>
   )
@@ -272,15 +230,17 @@ export function ApkgImportProbe() {
 
 function DeckResults({
   activeDeck,
+  isReplacing,
+  onClearWorkspace,
+  onReplaceDeck,
 }: {
   activeDeck: ActiveDeck
+  isReplacing: boolean
+  onClearWorkspace: () => void
+  onReplaceDeck: () => void
 }) {
   const [selectedNoteIndex, setSelectedNoteIndex] = useState(0)
   const [deck, setDeck] = useState<ActiveDeck>(activeDeck)
-  const [transformationConfigs, setTransformationConfigs] = useState<TransformationConfig[]>(
-    () => DEFAULT_TRANSFORMATIONS.map((t) => ({ ...t }))
-  )
-  const [blockLayouts, setBlockLayouts] = useState<Record<string, LayoutConfig>>({})
   const summary = deck.deck
   const selectedNote = summary.sampleNotes[selectedNoteIndex] ?? null
 
@@ -301,13 +261,6 @@ function DeckResults({
     [noteTypeMappings]
   )
 
-  const handleBlockLayoutChange = useCallback((noteTypeId: string, layout: LayoutConfig) => {
-    setBlockLayouts((prev) => ({
-      ...prev,
-      [noteTypeId]: layout,
-    }))
-  }, [])
-
   async function handleUpdateFieldRole(noteTypeId: string, fieldName: string, role: FieldRole) {
     const updated = updateFieldMapping(deck, noteTypeId, fieldName, role)
     setDeck(updated)
@@ -320,205 +273,112 @@ function DeckResults({
     await saveActiveDeck(updated)
   }
 
-  function toggleTransformation(type: TransformationType) {
-    setTransformationConfigs((current) =>
-      current.map((config) =>
-        config.type === type ? { ...config, enabled: !config.enabled } : config
-      )
-    )
-  }
-
   return (
     <div className="space-y-5">
+      <ImportReadyPanel
+        deck={deck}
+        fieldMappings={getFieldMappings(summary.noteTypes[0]?.id ?? "")}
+        templateSelection={getTemplateSelection(summary.noteTypes[0]?.id ?? "")}
+        isReplacing={isReplacing}
+        onClearWorkspace={onClearWorkspace}
+        onReplaceDeck={onReplaceDeck}
+      />
 
-      {/* Stats overview */}
-      <SectionCard label="Overview" heading="Deck stats">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <BigStat label="Notes" value={String(summary.noteCount)} />
-          <BigStat label="Cards" value={String(summary.cardCount)} />
-          <BigStat label="Note types" value={String(summary.noteTypeCount)} />
-          <BigStat label="Media files" value={String(summary.mediaCount)} />
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <SmallStat label="Templates" value={String(summary.templateCount)} />
-          <SmallStat label="Named fields" value={String(summary.fieldCount)} />
-          <SmallStat label="SQLite" value={summary.sqliteVersion} />
-          <SmallStat label="Collection" value={summary.collectionFileName} />
-        </div>
-      </SectionCard>
-
-      {/* Note types */}
-      <SectionCard label="Schema" heading="Note types">
-        <div className="space-y-3">
-          {summary.noteTypes.map((noteType) => (
-            <div
-              key={noteType.id}
-              className=" border-2 border-black bg-white p-5"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[16px] font-medium text-[#1a1a1a]">{noteType.name}</p>
-                  <p className="mt-0.5 font-mono text-[12px] text-[#757575]">
-                    ID {noteType.id}
-                  </p>
-                </div>
-                <span className="shrink-0 border-2 border-black bg-[#f5f5f5] px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.04em] text-[#757575]">
-                  {noteType.templates.length} templates
-                </span>
-              </div>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                <FieldChipRow label="Fields" values={noteType.fieldNames} />
-                <FieldChipRow
-                  label="Templates"
-                  values={noteType.templates.map((t) => t.name)}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </SectionCard>
-
-      {/* Mapping suggestions */}
-      <SectionCard label="Mapping" heading="Suggested field roles">
-        <div className="space-y-3">
-          {summary.noteTypes.map((noteType) => (
-            <MappingSuggestionCard
-              key={noteType.id}
-              noteType={noteType}
-              suggestions={detectFieldRoles({
-                noteType,
-                notes: summary.sampleNotes,
-              })}
-              selectedRoles={getFieldMappings(noteType.id)}
-              onRoleChange={(fieldName, role) =>
-                handleUpdateFieldRole(noteType.id, fieldName, role)
-              }
-            />
-          ))}
-        </div>
-      </SectionCard>
-
-      {/* Template selection */}
-      <SectionCard label="Template" heading="Choose a template">
-        <div className="space-y-3">
-          {summary.noteTypes.map((noteType) => (
-            <TemplateSelectionCard
-              key={noteType.id}
-              noteType={noteType}
-              fieldMappings={getFieldMappings(noteType.id)}
-              selectedTemplate={getTemplateSelection(noteType.id)}
-              onTemplateChange={(templateType) =>
-                handleUpdateTemplateSelection(noteType.id, templateType)
-              }
-            />
-          ))}
-        </div>
-      </SectionCard>
-
-      {/* Card browser */}
-      <SectionCard label="Sample notes" heading="Card browser">
-        <div className="flex items-center justify-between gap-3 pb-4">
-          <p className="text-[14px] text-[#757575]">
-            Showing up to 50 sample notes parsed from this deck.
-          </p>
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              aria-label="Previous note"
-              disabled={selectedNoteIndex === 0}
-              onClick={() => setSelectedNoteIndex(Math.max(0, selectedNoteIndex - 1))}
-            >
-              <ChevronLeft />
-            </Button>
-            <span className="min-w-12 text-center font-mono text-[12px] text-[#757575]">
-              {selectedNoteIndex + 1}/{summary.sampleNotes.length}
-            </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              aria-label="Next note"
-              disabled={selectedNoteIndex >= summary.sampleNotes.length - 1}
-              onClick={() =>
-                setSelectedNoteIndex(Math.min(summary.sampleNotes.length - 1, selectedNoteIndex + 1))
-              }
-            >
-              <ChevronRight />
-            </Button>
+      <AdvancedDeckReview hasMedia={summary.mediaSamples.length > 0}>
+        {/* Mapping suggestions */}
+        <SectionCard label="Mapping" heading="Field roles" initialOpen={false}>
+          <div className="mb-4 border-2 border-black bg-[#f5f5f5] p-4 text-[14px] leading-[1.45] text-[#4A4744]">
+            Totoneru guesses which Anki fields are the word, reading, meaning, and example sentence.
+            Change these only if previews look wrong.
           </div>
-        </div>
-        <div className="max-h-[28rem] space-y-2 overflow-y-auto pr-1">
-          {summary.sampleNotes.map((note, index) => {
-            const noteType = summary.noteTypes.find((nt) => nt.id === note.noteTypeId)
-            const isSelected = index === selectedNoteIndex
-            return (
-              <NoteRow
-                key={note.id}
-                note={note}
+          <div className="space-y-3">
+            {summary.noteTypes.map((noteType) => (
+              <MappingSuggestionCard
+                key={noteType.id}
                 noteType={noteType}
-                isSelected={isSelected}
-                onClick={() => setSelectedNoteIndex(index)}
+                suggestions={detectFieldRoles({
+                  noteType,
+                  notes: summary.sampleNotes,
+                })}
+                selectedRoles={getFieldMappings(noteType.id)}
+                onRoleChange={(fieldName, role) =>
+                  handleUpdateFieldRole(noteType.id, fieldName, role)
+                }
               />
-            )
-          })}
-        </div>
-      </SectionCard>
+            ))}
+          </div>
+        </SectionCard>
 
-      {/* Card preview */}
-      {selectedNote && (
-        <>
-          <SectionCard label="Transform" heading="Built-in transformations">
-            <div className="space-y-2">
-              {transformationConfigs.map((config) => (
-                <label
-                  key={config.type}
-                  className="flex cursor-pointer items-center justify-between gap-3 border-2 border-black bg-white px-4 py-3"
-                >
-                  <div>
-                    <p className="text-[14px] font-medium text-[#1a1a1a]">
-                      {config.type === "furigana" && "Furigana generation"}
-                      {config.type === "htmlClean" && "HTML cleaner"}
-                      {config.type === "fieldNormalize" && "Field normalizer"}
-                    </p>
-                    <p className="text-[12px] text-[#757575]">
-                      {config.type === "furigana" && "Add ruby annotations to kanji using kuromoji.js"}
-                      {config.type === "htmlClean" && "Strip font/span/style/class tags"}
-                      {config.type === "fieldNormalize" && "Normalize whitespace and line endings"}
-                    </p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={config.enabled}
-                    onChange={() => toggleTransformation(config.type)}
-                    className="size-4 accent-black"
-                  />
-                </label>
-              ))}
+        {/* Template selection */}
+        <SectionCard label="Layout" heading="Card layout" initialOpen={false}>
+          <div className="mb-4 border-2 border-black bg-[#f5f5f5] p-4 text-[14px] leading-[1.45] text-[#4A4744]">
+            This controls how exported cards are arranged. Leave the suggested layout unless you
+            know you want a different card shape.
+          </div>
+          <div className="space-y-3">
+            {summary.noteTypes.map((noteType) => (
+              <TemplateSelectionCard
+                key={noteType.id}
+                noteType={noteType}
+                fieldMappings={getFieldMappings(noteType.id)}
+                selectedTemplate={getTemplateSelection(noteType.id)}
+                sampleNote={
+                  selectedNote?.noteTypeId === noteType.id
+                    ? selectedNote
+                    : summary.sampleNotes.find((note) => note.noteTypeId === noteType.id) ?? null
+                }
+                onTemplateChange={(templateType) =>
+                  handleUpdateTemplateSelection(noteType.id, templateType)
+                }
+              />
+            ))}
+          </div>
+        </SectionCard>
+
+        {/* Card browser */}
+        <SectionCard label="Samples" heading="Sample cards" initialOpen={false}>
+          <div className="flex items-center justify-between gap-3 pb-4">
+            <p className="text-[14px] text-[#757575]">
+              A small sample from the imported deck for checking parsed fields and previews.
+            </p>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                aria-label="Previous note"
+                disabled={selectedNoteIndex === 0}
+                onClick={() => setSelectedNoteIndex(Math.max(0, selectedNoteIndex - 1))}
+              >
+                <ChevronLeft />
+              </Button>
+              <span className="min-w-12 text-center font-mono text-[12px] text-[#757575]">
+                {selectedNoteIndex + 1}/{summary.sampleNotes.length}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                aria-label="Next note"
+                disabled={selectedNoteIndex >= summary.sampleNotes.length - 1}
+                onClick={() =>
+                  setSelectedNoteIndex(Math.min(summary.sampleNotes.length - 1, selectedNoteIndex + 1))
+                }
+              >
+                <ChevronRight />
+              </Button>
             </div>
-          </SectionCard>
-
-          <CardPreviewSection
-            note={selectedNote}
+          </div>
+          <SampleCardsPanel
+            notes={summary.sampleNotes}
             noteTypes={summary.noteTypes}
-            getFieldMappings={getFieldMappings}
-            getTemplateSelection={getTemplateSelection}
-            transformationConfigs={transformationConfigs}
-            blockLayout={blockLayouts[selectedNote.noteTypeId]}
-            onBlockLayoutChange={(layout) =>
-              handleBlockLayoutChange(selectedNote.noteTypeId, layout)
-            }
+            selectedIndex={selectedNoteIndex}
+            onSelect={setSelectedNoteIndex}
           />
-        </>
-      )}
+        </SectionCard>
 
-      {/* Media + Schema */}
-      <div className="grid gap-5 lg:grid-cols-2">
-        <SectionCard label="Assets" heading="Media manifest">
-          {summary.mediaSamples.length === 0 ? (
-            <p className="text-[15px] text-[#757575]">No media entries found.</p>
-          ) : (
+        {summary.mediaSamples.length > 0 && (
+          <SectionCard label="Assets" heading="Media files" initialOpen={false}>
             <div className="space-y-2">
               {summary.mediaSamples.map((item) => (
                 <div
@@ -532,31 +392,9 @@ function DeckResults({
                 </div>
               ))}
             </div>
-          )}
-        </SectionCard>
-
-        <SectionCard label="Integrity" heading="Schema &amp; backup">
-          <div className="space-y-3">
-            <div className="flex flex-wrap gap-2">
-              {summary.tableNames.map((name) => (
-                <span
-                  key={name}
-                  className=" border-2 border-black bg-[#f5f5f5] px-2 py-1 font-mono text-[12px] text-[#757575]"
-                >
-                  {name}
-                </span>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              <SmallStat label="Zip entries" value={String(summary.zipEntryCount)} />
-              <SmallStat
-                label="Backup size"
-                value={`${Math.round(deck.fileSize / 1024)} KB`}
-              />
-            </div>
-          </div>
-        </SectionCard>
-      </div>
+          </SectionCard>
+        )}
+      </AdvancedDeckReview>
 
     </div>
   )
@@ -564,64 +402,178 @@ function DeckResults({
 
 /* ---------- sub-components ---------- */
 
+function ImportReadyPanel({
+  deck,
+  fieldMappings,
+  templateSelection,
+  isReplacing,
+  onClearWorkspace,
+  onReplaceDeck,
+}: {
+  deck: ActiveDeck
+  fieldMappings: Record<string, FieldRole>
+  templateSelection: TemplateType
+  isReplacing: boolean
+  onClearWorkspace: () => void
+  onReplaceDeck: () => void
+}) {
+  const summary = deck.deck
+  const mappedRoles = new Set(Object.values(fieldMappings).filter((role) => role !== "unknown"))
+
+  return (
+    <section className="border-2 border-black bg-white p-6 sm:p-8">
+      <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
+        <div>
+          <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[#757575]">
+            Current deck
+          </p>
+          <h3 className="mt-1 text-[30px] font-black leading-none tracking-[-0.02em]">
+            {deck.fileName}
+          </h3>
+          <p className="mt-3 max-w-2xl text-[15px] leading-[1.5] text-[#4A4744]">
+            Imported safely with an original backup saved in your browser. Totoneru detected a
+            usable card structure, so the next step is editing or previewing changes.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Link
+              href="/ai"
+              className="inline-flex min-h-11 items-center justify-center border-2 border-black bg-black px-4 py-2 text-[14px] font-bold text-white transition-colors hover:bg-white hover:text-black"
+            >
+              Continue to AI
+            </Link>
+            <Link
+              href="/batch"
+              className="inline-flex min-h-11 items-center justify-center border-2 border-black bg-white px-4 py-2 text-[14px] font-bold text-black transition-colors hover:bg-black hover:text-white"
+            >
+              Preview batch changes
+            </Link>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onReplaceDeck}
+              disabled={isReplacing}
+            >
+              {isReplacing ? <LoaderCircle className="animate-spin" /> : <Upload />}
+              Replace deck
+            </Button>
+            <Button type="button" variant="outline" onClick={onClearWorkspace}>
+              <X />
+              Clear
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <SummaryStat label="Notes" value={String(summary.noteCount)} />
+          <SummaryStat label="Cards" value={String(summary.cardCount)} />
+          <SummaryStat label="Fields mapped" value={`${mappedRoles.size}/${summary.fieldCount}`} />
+          <SummaryStat label="Layout" value={getTemplateDisplayName(templateSelection)} />
+        </div>
+      </div>
+      <div className="mt-6 grid gap-3 border-t-2 border-black pt-4 sm:grid-cols-3">
+        <CheckLine label="Original backup saved" />
+        <CheckLine label={`${Math.round(deck.fileSize / 1024)} KB local file`} />
+        <CheckLine label={`${summary.collectionFileName} supported`} />
+      </div>
+    </section>
+  )
+}
+
+function SummaryStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border-2 border-black bg-[#f5f5f5] p-4">
+      <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[#757575]">
+        {label}
+      </p>
+      <p className="mt-1 break-words text-[20px] font-black leading-none text-[#1a1a1a]">{value}</p>
+    </div>
+  )
+}
+
+function CheckLine({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.1em] text-[#1a1a1a]">
+      <span className="flex size-5 items-center justify-center border-2 border-black bg-black text-[12px] leading-none text-white">
+        ✓
+      </span>
+      {label}
+    </div>
+  )
+}
+
+function AdvancedDeckReview({
+  children,
+  hasMedia,
+}: {
+  children: React.ReactNode
+  hasMedia: boolean
+}) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <section>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center justify-between gap-4 border-2 border-black bg-white p-6 text-left transition-colors hover:bg-[#f5f5f5]"
+        aria-expanded={open}
+      >
+        <div>
+          <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[#757575]">
+            Optional
+          </p>
+          <h3 className="mt-1 text-[24px] font-black leading-none">Advanced deck review</h3>
+          <p className="mt-2 max-w-2xl text-[14px] leading-[1.45] text-[#757575]">
+            {hasMedia
+              ? "Field mapping, layout choice, sample cards, and media files."
+              : "Field mapping, layout choice, and sample cards."}
+          </p>
+        </div>
+        <ChevronDown
+          className="size-5 shrink-0 transition-transform"
+          style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}
+          aria-hidden="true"
+        />
+      </button>
+      {open && <div className="mt-5 space-y-5">{children}</div>}
+    </section>
+  )
+}
+
 function SectionCard({
   label,
   heading,
   children,
+  initialOpen = true,
 }: {
   label: string
   heading: string
   children: React.ReactNode
+  initialOpen?: boolean
 }) {
-  return (
-    <div className=" border-2 border-black bg-white p-8 ">
-      <p className="mb-1 font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-[#757575]">
-        {label}
-      </p>
-      <h3 className="mb-6 text-[20px] font-medium text-[#1a1a1a]">{heading}</h3>
-      {children}
-    </div>
-  )
-}
+  const [open, setOpen] = useState(initialOpen)
 
-function BigStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className=" border-2 border-black bg-white p-5">
-      <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-[#757575]">
-        {label}
-      </p>
-      <p className="mt-2 font-mono text-[28px] font-medium text-[#1a1a1a]">{value}</p>
-    </div>
-  )
-}
-
-function SmallStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className=" border-2 border-black bg-white px-4 py-3">
-      <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#757575]">
-        {label}
-      </p>
-      <p className="mt-1 break-all font-mono text-[13px] text-[#1a1a1a]">{value}</p>
-    </div>
-  )
-}
-
-function FieldChipRow({ label, values }: { label: string; values: string[] }) {
-  return (
-    <div>
-      <p className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#757575]">
-        {label}
-      </p>
-      <div className="flex flex-wrap gap-1.5">
-        {values.map((v) => (
-          <span
-            key={v}
-            className=" border-2 border-black bg-[#f5f5f5] px-2 py-0.5 font-mono text-[12px] text-[#1a1a1a]"
-          >
-            {v}
-          </span>
-        ))}
-      </div>
+    <div className="border-2 border-black bg-white">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center justify-between gap-4 p-8 text-left"
+        aria-expanded={open}
+      >
+        <div>
+          <p className="mb-1 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[#757575]">
+            {label}
+          </p>
+          <h3 className="text-[20px] font-medium text-[#1a1a1a]">{heading}</h3>
+        </div>
+        <ChevronDown
+          className="size-5 shrink-0 transition-transform"
+          style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}
+          aria-hidden="true"
+        />
+      </button>
+      {open && <div className="px-8 pb-8">{children}</div>}
     </div>
   )
 }
@@ -646,7 +598,7 @@ function MappingSuggestionCard({
             Heuristic only. Editable mapping comes next.
           </p>
         </div>
-        <span className="shrink-0 border-2 border-black bg-[#f5f5f5] px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.04em] text-[#757575]">
+        <span className="shrink-0 border-2 border-black bg-[#f5f5f5] px-2.5 py-1 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[#757575]">
           {suggestions.length} fields
         </span>
       </div>
@@ -709,7 +661,7 @@ function ConfidenceBadge({ confidence }: { confidence: number }) {
 
   return (
     <span
-      className=" border-2 border-black bg-[#f5f5f5] px-2 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-[0.04em] text-[#757575]"
+      className=" border-2 border-black bg-[#f5f5f5] px-2 py-0.5 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[#757575]"
       title={`${percent}% confidence`}
     >
       {label} · {percent}%
@@ -717,276 +669,242 @@ function ConfidenceBadge({ confidence }: { confidence: number }) {
   )
 }
 
-function NoteRow({
-  note,
-  noteType,
-  isSelected,
-  onClick,
-}: {
-  note: ParsedNote
-  noteType: ParsedNoteType | undefined
-  isSelected: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={isSelected}
-      className="w-full border-2 border-black bg-white p-5 text-left transition-colors hover:bg-[#f5f5f5] data-[selected=true]:border-black/20 data-[selected=true]:bg-[#f5f5f5]"
-      data-selected={isSelected}
-      onClick={onClick}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-[15px] font-medium text-[#1a1a1a]">
-          {noteType?.name ?? "Unknown note type"}
-        </p>
-        <span className="shrink-0 font-mono text-[12px] text-[#757575]">
-          #{note.id}
-        </span>
-      </div>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        {note.fieldValues.slice(0, 4).map((value, i) => (
-          <div key={`${note.id}-${i}`} className=" border-2 border-black bg-[#f5f5f5] px-3 py-2">
-            <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#757575]">
-              {noteType?.fieldNames[i] ?? `Field ${i + 1}`}
-            </p>
-            <p className="mt-1 line-clamp-2 text-[13px] text-[#1a1a1a]">{value || "(empty)"}</p>
-          </div>
-        ))}
-      </div>
-    </button>
-  )
-}
-
-function CardPreviewSection({
-  note,
+function SampleCardsPanel({
+  notes,
   noteTypes,
-  getFieldMappings,
-  getTemplateSelection,
-  transformationConfigs,
-  blockLayout,
-  onBlockLayoutChange,
+  selectedIndex,
+  onSelect,
 }: {
-  note: ParsedNote
+  notes: ParsedNote[]
   noteTypes: ParsedNoteType[]
-  getFieldMappings: (noteTypeId: string) => Record<string, FieldRole>
-  getTemplateSelection: (noteTypeId: string) => TemplateType
-  transformationConfigs: TransformationConfig[]
-  blockLayout?: LayoutConfig
-  onBlockLayoutChange?: (layout: LayoutConfig) => void
+  selectedIndex: number
+  onSelect: (index: number) => void
 }) {
-  const noteType = noteTypes.find((c) => c.id === note.noteTypeId)
-  const template = noteType ? getFirstRenderableTemplate(noteType) : null
+  const selectedNote = notes[selectedIndex] ?? null
+  const selectedNoteType = selectedNote
+    ? noteTypes.find((noteType) => noteType.id === selectedNote.noteTypeId)
+    : undefined
 
-  if (!noteType || !template) {
-    return (
-      <SectionCard label="Render" heading="Card preview">
-        <p className="text-[15px] text-[#757575]">
-          This note has no renderable card template.
-        </p>
-      </SectionCard>
-    )
+  if (!selectedNote) {
+    return <p className="text-[15px] text-[#757575]">No sample cards were found in this deck.</p>
   }
 
   return (
-    <CardPreviewContent
-      note={note}
-      noteType={noteType}
-      template={template}
-      fieldMappings={getFieldMappings(note.noteTypeId)}
-      templateType={getTemplateSelection(note.noteTypeId)}
-      transformationConfigs={transformationConfigs}
-      blockLayout={blockLayout}
-      onBlockLayoutChange={onBlockLayoutChange}
-    />
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_14rem]">
+      <AnkiCardPreview note={selectedNote} noteType={selectedNoteType} />
+      <div className="border-2 border-black bg-[#f5f5f5] p-3">
+        <p className="mb-2 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[#757575]">
+          Samples
+        </p>
+        <div className="max-h-[20rem] space-y-2 overflow-y-auto pr-1">
+          {notes.map((note, index) => {
+            const noteType = noteTypes.find((candidate) => candidate.id === note.noteTypeId)
+            const isSelected = index === selectedIndex
+
+            return (
+              <button
+                key={note.id}
+                type="button"
+                aria-pressed={isSelected}
+                className="w-full border-2 border-black bg-white px-3 py-2 text-left text-[13px] font-medium text-[#1a1a1a] transition-colors hover:bg-[#f5f5f5] data-[selected=true]:bg-black data-[selected=true]:text-white"
+                data-selected={isSelected}
+                onClick={() => onSelect(index)}
+              >
+                <span className="block truncate">{getSampleCardLabel(note, noteType, index)}</span>
+                <span className="mt-0.5 block truncate font-mono text-[11px] opacity-70">
+                  {noteType?.name ?? "Unknown note type"}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
   )
 }
 
-function CardPreviewContent({
+function AnkiCardPreview({
   note,
   noteType,
-  template,
-  fieldMappings,
-  templateType,
-  transformationConfigs,
-  blockLayout,
-  onBlockLayoutChange,
 }: {
   note: ParsedNote
-  noteType: ParsedNoteType
-  template: { name: string; front: string; back: string }
-  fieldMappings: Record<string, FieldRole>
-  templateType: TemplateType
-  transformationConfigs: TransformationConfig[]
-  blockLayout?: LayoutConfig
-  onBlockLayoutChange?: (layout: LayoutConfig) => void
+  noteType: ParsedNoteType | undefined
 }) {
-  const [preview, setPreview] = useState<{
-    transformedFrontHtml: string
-    transformedBackHtml: string
-    fieldDiffs: { name: string; before: string; after: string; moved?: boolean }[]
-    isLoading: boolean
-  }>({
-    transformedFrontHtml: "",
-    transformedBackHtml: "",
-    fieldDiffs: [],
-    isLoading: true,
+  if (!noteType) {
+    return (
+      <div className="border-2 border-black bg-white p-5 text-[15px] text-[#757575]">
+        This sample uses a note type that was not found.
+      </div>
+    )
+  }
+
+  const template = getFirstRenderableTemplate(noteType)
+
+  if (!template) {
+    return (
+      <div className="border-2 border-black bg-white p-5 text-[15px] text-[#757575]">
+        This note type does not include an Anki card template.
+      </div>
+    )
+  }
+
+  const front = renderAnkiTemplate({
+    template: template.front,
+    note,
+    noteType,
   })
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function computePreview() {
-      setPreview((p) => ({ ...p, isLoading: true }))
-
-      const transformed = applyTemplateTransform({
-        note,
-        noteType,
-        fieldMappings,
-        templateType,
-      })
-
-      const transformedNote = transformed.note
-
-      for (let i = 0; i < noteType.fieldNames.length; i++) {
-        const fieldName = noteType.fieldNames[i]
-        const role = fieldMappings[fieldName] ?? "unknown"
-        const originalValue = note.fieldValues[i] ?? ""
-        const transformedIndex = transformed.fieldOrder.indexOf(fieldName)
-        if (transformedIndex >= 0) {
-          const result = await applyTransformations({
-            value: originalValue,
-            role,
-            configs: transformationConfigs,
-          })
-          transformedNote.fieldValues[transformedIndex] = result.value
-        }
-      }
-
-      const fieldDiffs = computeTemplateDiffs({
-        originalNote: note,
-        transformedNote,
-        originalNoteType: noteType,
-        transformedFieldOrder: transformed.fieldOrder,
-      })
-
-      const transformedFrontHtml = blockLayout
-        ? generatePreviewWithBlocks({
-            note: transformedNote,
-            noteType,
-            fieldMappings,
-            layout: blockLayout,
-            face: "front",
-          }).html
-        : templateType === "none"
-          ? renderAnkiTemplate({
-              template: template.front,
-              note: transformedNote,
-              noteType,
-            })
-          : renderTemplatePreviewHtml({
-              note: transformedNote,
-              noteType,
-              fieldMappings,
-              templateType,
-              face: "front",
-            })
-
-      const transformedBackHtml = blockLayout
-        ? generatePreviewWithBlocks({
-            note: transformedNote,
-            noteType,
-            fieldMappings,
-            layout: blockLayout,
-            face: "back",
-          }).html
-        : templateType === "none"
-          ? renderAnkiTemplate({
-              template: template.back,
-              note: transformedNote,
-              noteType,
-            })
-          : renderTemplatePreviewHtml({
-              note: transformedNote,
-              noteType,
-              fieldMappings,
-              templateType,
-              face: "back",
-            })
-
-      if (!cancelled) {
-        setPreview({
-          transformedFrontHtml,
-          transformedBackHtml,
-          fieldDiffs,
-          isLoading: false,
-        })
-      }
-    }
-
-    computePreview()
-
-    return () => {
-      cancelled = true
-    }
-  }, [note, noteType, template, fieldMappings, templateType, transformationConfigs, blockLayout])
-
-  const frontHtml = renderAnkiTemplate({ template: template.front, note, noteType })
-  const backHtml = renderAnkiTemplate({ template: template.back, note, noteType })
-  const blockStyles = blockLayout
-    ? generatePreviewWithBlocks({ note, noteType, fieldMappings, layout: blockLayout, face: "front" }).styles
-    : ""
-  const extraStyles = blockLayout
-    ? blockStyles
-    : templateType !== "none"
-      ? getTemplatePreviewStyles()
-      : ""
+  const back = renderAnkiTemplate({
+    template: template.back,
+    note,
+    noteType,
+    frontSide: front,
+  })
+  const styles = noteType.css ?? ""
 
   return (
-    <SectionCard label="Preview" heading="Original vs transformed">
-      {onBlockLayoutChange && (
-        <div className="mb-4">
-          <BlockEditor
-            availableRoles={Object.values(fieldMappings).filter((r): r is FieldRole => r !== "unknown")}
-            initialLayout={blockLayout}
-            onLayoutChange={onBlockLayoutChange}
-          />
+    <div className="border-2 border-black bg-white p-4">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[15px] font-medium text-[#1a1a1a]">{template.name}</p>
+          <p className="mt-0.5 text-[12px] text-[#757575]">
+            Rendered from the imported Anki front and back templates.
+          </p>
         </div>
-      )}
-      <div className="mb-4 flex items-center gap-2">
-        <span className="font-mono text-[12px] text-[#757575]">{noteType.name}</span>
-        <span className="text-[#757575]">·</span>
-        <span className="font-mono text-[12px] text-[#757575]">{template.name}</span>
-        {templateType !== "none" && (
-          <>
-            <span className="text-[#757575]">·</span>
-            <span className=" border-2 border-black bg-[#f5f5f5] px-2 py-0.5 font-mono text-[11px] text-[#757575]">
-              {templateType} template
-            </span>
-          </>
-        )}
-        <span className="ml-auto border-2 border-black bg-[#f5f5f5] px-2 py-0.5 font-mono text-[11px] text-[#757575]">
-          sandboxed iframe
-        </span>
+        <span className="shrink-0 font-mono text-[12px] text-[#757575]">#{note.id}</span>
       </div>
-      <div className="grid gap-4 xl:grid-cols-2">
-        <PreviewPane
-          title="Original"
-          frontHtml={frontHtml}
-          backHtml={backHtml}
-          changed={false}
-        />
-        <PreviewPane
-          title="Transformed preview"
-          frontHtml={preview.transformedFrontHtml}
-          backHtml={preview.transformedBackHtml}
-          changed={preview.fieldDiffs.length > 0}
-          extraStyles={extraStyles}
-          isLoading={preview.isLoading}
-        />
+      <PreviewFaceGrid
+        frontHtml={createPreviewDocument({
+          body: front,
+          title: `${noteType.name} front`,
+          extraStyles: styles,
+        })}
+        backHtml={createPreviewDocument({
+          body: back,
+          title: `${noteType.name} back`,
+          extraStyles: styles,
+        })}
+      />
+    </div>
+  )
+}
+
+function PreviewFaceGrid({
+  frontHtml,
+  backHtml,
+}: {
+  frontHtml: string
+  backHtml: string
+}) {
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      <PreviewFrame label="Front" html={frontHtml} />
+      <PreviewFrame label="Back" html={backHtml} />
+    </div>
+  )
+}
+
+function PreviewFrame({ label, html }: { label: string; html: string }) {
+  return (
+    <div className="border-2 border-black bg-[#f5f5f5]">
+      <div className="border-b-2 border-black px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[#757575]">
+        {label}
       </div>
-      <FieldDiffPanel diffs={preview.fieldDiffs} />
-    </SectionCard>
+      <iframe
+        title={`${label} Anki card preview`}
+        srcDoc={html}
+        sandbox="allow-scripts"
+        className="h-64 w-full bg-white"
+      />
+    </div>
+  )
+}
+
+function getSampleCardLabel(
+  note: ParsedNote,
+  noteType: ParsedNoteType | undefined,
+  index: number
+) {
+  const firstValue = note.fieldValues.find((value) => value.trim().length > 0)
+  return firstValue ?? noteType?.name ?? `Sample ${index + 1}`
+}
+
+function LayoutPreview({
+  noteType,
+  fieldMappings,
+  selectedTemplate,
+  sampleNote,
+}: {
+  noteType: ParsedNoteType
+  fieldMappings: Record<string, FieldRole>
+  selectedTemplate: TemplateType
+  sampleNote: ParsedNote | null
+}) {
+  if (!sampleNote) {
+    return (
+      <div className="mt-4 border-t-2 border-black pt-4 text-[14px] text-[#757575]">
+        No sample note is available for this note type.
+      </div>
+    )
+  }
+
+  const originalTemplate = getFirstRenderableTemplate(noteType)
+  const front =
+    selectedTemplate === "none" && originalTemplate
+      ? renderAnkiTemplate({
+          template: originalTemplate.front,
+          note: sampleNote,
+          noteType,
+        })
+      : renderTemplatePreviewHtml({
+          note: sampleNote,
+          noteType,
+          fieldMappings,
+          templateType: selectedTemplate,
+          face: "front",
+        })
+  const back =
+    selectedTemplate === "none" && originalTemplate
+      ? renderAnkiTemplate({
+          template: originalTemplate.back,
+          note: sampleNote,
+          noteType,
+          frontSide: front,
+        })
+      : renderTemplatePreviewHtml({
+          note: sampleNote,
+          noteType,
+          fieldMappings,
+          templateType: selectedTemplate,
+          face: "back",
+        })
+  const styles =
+    selectedTemplate === "none" ? noteType.css ?? "" : getTemplatePreviewStyles(selectedTemplate)
+
+  return (
+    <div className="mt-4 border-t-2 border-black pt-4">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[14px] font-medium text-[#1a1a1a]">Anki preview</p>
+          <p className="mt-0.5 text-[12px] text-[#757575]">
+            {selectedTemplate === "none"
+              ? "Original card template from the imported deck."
+              : "Preview of the selected export layout using this deck's sample data."}
+          </p>
+        </div>
+      </div>
+      <PreviewFaceGrid
+        frontHtml={createPreviewDocument({
+          body: front,
+          title: `${noteType.name} layout front`,
+          extraStyles: styles,
+        })}
+        backHtml={createPreviewDocument({
+          body: back,
+          title: `${noteType.name} layout back`,
+          extraStyles: styles,
+        })}
+      />
+    </div>
   )
 }
 
@@ -996,11 +914,13 @@ function TemplateSelectionCard({
   noteType,
   fieldMappings,
   selectedTemplate,
+  sampleNote,
   onTemplateChange,
 }: {
   noteType: ParsedNoteType
   fieldMappings: Record<string, FieldRole>
   selectedTemplate: TemplateType
+  sampleNote: ParsedNote | null
   onTemplateChange: (templateType: TemplateType) => void
 }) {
   const match = getBestTemplateMatch(fieldMappings)
@@ -1017,7 +937,7 @@ function TemplateSelectionCard({
             </p>
           )}
         </div>
-        <span className="shrink-0 border-2 border-black bg-[#f5f5f5] px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.04em] text-[#757575]">
+        <span className="shrink-0 border-2 border-black bg-[#f5f5f5] px-2.5 py-1 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[#757575]">
           {noteType.fieldNames.length} fields
         </span>
       </div>
@@ -1031,7 +951,7 @@ function TemplateSelectionCard({
         >
           {TEMPLATE_OPTIONS.map((option) => (
             <option key={option} value={option}>
-              {option === "none" ? "None (keep original)" : `${option.charAt(0).toUpperCase() + option.slice(1)}`}
+              {getTemplateDisplayName(option)}
             </option>
           ))}
         </select>
@@ -1049,6 +969,13 @@ function TemplateSelectionCard({
           This template was auto-selected based on detected field roles.
         </p>
       )}
+
+      <LayoutPreview
+        noteType={noteType}
+        fieldMappings={fieldMappings}
+        selectedTemplate={selectedTemplate}
+        sampleNote={sampleNote}
+      />
     </div>
   )
 }
@@ -1067,7 +994,7 @@ function TemplateFieldChecklist({
     <div className="mt-3 space-y-2">
       {template.requiredRoles.length > 0 && (
         <div>
-          <p className="mb-1 font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#757575]">
+          <p className="mb-1 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[#757575]">
             Required
           </p>
           <div className="flex flex-wrap gap-1.5">
@@ -1091,7 +1018,7 @@ function TemplateFieldChecklist({
       )}
       {template.optionalRoles.length > 0 && (
         <div>
-          <p className="mb-1 font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#757575]">
+          <p className="mb-1 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[#757575]">
             Optional
           </p>
           <div className="flex flex-wrap gap-1.5">
@@ -1117,139 +1044,15 @@ function TemplateFieldChecklist({
   )
 }
 
-/* ---------- diff components ---------- */
-
-function PreviewPane({
-  title,
-  frontHtml,
-  backHtml,
-  changed,
-  extraStyles = "",
-  isLoading = false,
-}: {
-  title: string
-  frontHtml: string
-  backHtml: string
-  changed: boolean
-  extraStyles?: string
-  isLoading?: boolean
-}) {
-  return (
-    <div className=" border-2 border-black bg-white p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-[15px] font-medium text-[#1a1a1a]">{title}</p>
-        <span
-          className=" border-2 border-black bg-[#f5f5f5] px-2 py-0.5 font-mono text-[11px] text-[#757575]"
-          data-changed={changed}
-        >
-          {isLoading ? "computing…" : changed ? "changed" : "unchanged"}
-        </span>
-      </div>
-      <div className="grid gap-3">
-        <PreviewFrame
-          title="Front"
-          html={createPreviewDocument({ title: `${title} front`, body: frontHtml, extraStyles })}
-          isLoading={isLoading}
-        />
-        <PreviewFrame
-          title="Back"
-          html={createPreviewDocument({ title: `${title} back`, body: backHtml, extraStyles })}
-          isLoading={isLoading}
-        />
-      </div>
-    </div>
-  )
-}
-
-function FieldDiffPanel({ diffs }: { diffs: FieldDiff[] }) {
-  return (
-    <div className="mt-4 border-2 border-black bg-white p-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[15px] font-medium text-[#1a1a1a]">Diff summary</p>
-        <span className=" border-2 border-black bg-[#f5f5f5] px-2 py-0.5 font-mono text-[11px] text-[#757575]">
-          {diffs.length} fields
-        </span>
-      </div>
-      {diffs.length === 0 ? (
-        <p className="mt-3 text-[14px] text-[#757575]">
-          No field changes in the current preview transform.
-        </p>
-      ) : (
-        <div className="mt-3 space-y-3">
-          {diffs.map((diff) => (
-            <div key={diff.name} className=" border-2 border-black bg-white p-3">
-              <div className="flex items-center gap-2">
-                <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#757575]">
-                  {diff.name}
-                </p>
-                {diff.moved && (
-                  <span className=" bg-[rgba(184,135,58,0.12)] px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.04em] text-[#8A6528]">
-                    reordered
-                  </span>
-                )}
-              </div>
-              <div className="mt-2 grid gap-2 md:grid-cols-2">
-                <DiffValue label="Before" value={diff.before} tone="before" />
-                <DiffValue label="After" value={diff.after} tone="after" />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function DiffValue({
-  label,
-  value,
-  tone,
-}: {
-  label: string
-  value: string
-  tone: "before" | "after"
-}) {
-  return (
-    <div
-      className=" border px-3 py-2"
-      data-tone={tone}
-    >
-      <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#757575]">
-        {label}
-      </p>
-      <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-[13px] text-[#1a1a1a]">
-        {value || "(empty)"}
-      </p>
-    </div>
-  )
-}
-
-function PreviewFrame({
-  title,
-  html,
-  isLoading = false,
-}: {
-  title: string
-  html: string
-  isLoading?: boolean
-}) {
-  return (
-    <div className="overflow-hidden border-2 border-black bg-white">
-      <div className="border-b border-border px-4 py-2 font-mono text-[12px] font-medium text-[#757575]">
-        {title}
-      </div>
-      {isLoading ? (
-        <div className="flex h-64 items-center justify-center bg-white">
-          <LoaderCircle className="size-5 animate-spin text-[#757575]" />
-        </div>
-      ) : (
-        <iframe
-          title={`${title} card preview`}
-          sandbox=""
-          srcDoc={html}
-          className="h-64 w-full bg-white"
-        />
-      )}
-    </div>
-  )
+function getTemplateDisplayName(templateType: TemplateType) {
+  switch (templateType) {
+    case "expressionFocused":
+      return "Japanese vocab layout"
+    case "vocabulary":
+      return "Word card"
+    case "sentence":
+      return "Sentence card"
+    case "none":
+      return "Keep original layout"
+  }
 }

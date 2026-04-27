@@ -9,6 +9,7 @@ export type ParsedCardTemplate = {
 export type ParsedNoteType = {
   id: string
   name: string
+  css?: string
   fieldNames: string[]
   templates: ParsedCardTemplate[]
 }

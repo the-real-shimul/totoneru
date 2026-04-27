@@ -1,8 +1,9 @@
 import type { FieldRole } from "@/lib/schema-mapping"
 import type { ParsedNote, ParsedNoteType } from "@/lib/apkg-parser-types"
+import { renderAnkiTemplate } from "@/lib/anki-template-renderer"
 import { applyFieldNormalize } from "@/lib/transformations"
 
-export type TemplateType = "vocabulary" | "sentence" | "none"
+export type TemplateType = "expressionFocused" | "vocabulary" | "sentence" | "none"
 
 export type TemplateDefinition = {
   id: TemplateType
@@ -14,6 +15,14 @@ export type TemplateDefinition = {
 }
 
 export const TEMPLATES: Record<TemplateType, TemplateDefinition> = {
+  expressionFocused: {
+    id: "expressionFocused",
+    name: "Expression Focused",
+    description: "Kanji-first card matching the user's Anki expression layout",
+    requiredRoles: ["expression", "reading", "meaning", "translation"],
+    optionalRoles: ["sentence", "sentenceReading", "audio"],
+    preferredFieldOrder: [],
+  },
   vocabulary: {
     id: "vocabulary",
     name: "Vocabulary",
@@ -55,7 +64,55 @@ export const TEMPLATES: Record<TemplateType, TemplateDefinition> = {
   },
 }
 
-export const TEMPLATE_OPTIONS: TemplateType[] = ["vocabulary", "sentence", "none"]
+export const TEMPLATE_OPTIONS: TemplateType[] = [
+  "expressionFocused",
+  "vocabulary",
+  "sentence",
+  "none",
+]
+
+export const EXPRESSION_FOCUSED_CSS = `.card {
+  font-family: "Hiragino Sans", sans-serif;
+  text-align: center;
+  font-size: 20px;
+}
+
+.expression {
+  font-size: 40px;
+  font-weight: bold;
+  line-height: 1.8;
+}
+
+.meaning {
+  font-size: 18px;
+  color: #555;
+  margin-top: 10px;
+}
+
+.sentence {
+  font-size: 20px;
+  color: #ddd;
+  line-height: 2.2;
+  word-break: keep-all;
+}
+
+.sentence-en {
+  font-size: 16px;
+  color: #888;
+  margin-top: 6px;
+  font-style: italic;
+}
+
+hr { margin: 16px auto; }
+
+ruby rt {
+  color: #aaa;
+  transition: opacity 0.5s ease;
+  opacity: 0;
+}
+
+.noFurigana ruby rt { opacity: 0; }
+.yesFurigana ruby rt { opacity: 1; }`
 
 export type TemplateMatchResult = {
   template: TemplateDefinition
@@ -75,6 +132,10 @@ export function matchTemplates(
   return (Object.values(TEMPLATES) as TemplateDefinition[])
     .filter((t) => t.id !== "none")
     .map((template) => {
+      if (template.id === "expressionFocused") {
+        return matchExpressionFocusedTemplate(template, presentRoles)
+      }
+
       const matchedRequired = template.requiredRoles.filter((r) => presentRoles.has(r)).length
       const matchedOptional = template.optionalRoles.filter((r) => presentRoles.has(r)).length
       const missingRequired = template.requiredRoles.filter((r) => !presentRoles.has(r))
@@ -97,6 +158,38 @@ export function matchTemplates(
       }
     })
     .sort((a, b) => b.score - a.score)
+}
+
+function matchExpressionFocusedTemplate(
+  template: TemplateDefinition,
+  presentRoles: Set<FieldRole>
+): TemplateMatchResult {
+  const hasExample = presentRoles.has("sentence") || presentRoles.has("sentenceReading")
+  const matchedCore = template.requiredRoles.filter((r) => presentRoles.has(r)).length
+  const matchedRequired = matchedCore + (hasExample ? 1 : 0)
+  const totalRequired = template.requiredRoles.length + 1
+  const missingRequired = template.requiredRoles.filter((r) => !presentRoles.has(r))
+
+  if (!hasExample) {
+    missingRequired.push("sentence")
+  }
+
+  const matchedOptional = template.optionalRoles.filter((r) => presentRoles.has(r)).length
+  const totalOptional = template.optionalRoles.length
+  const requiredScore = matchedRequired / totalRequired
+  const optionalScore = totalOptional > 0 ? matchedOptional / totalOptional : 0
+  const score =
+    requiredScore === 1 ? requiredScore * 0.95 + optionalScore * 0.05 : requiredScore * 0.45
+
+  return {
+    template,
+    score,
+    matchedRequired,
+    totalRequired,
+    matchedOptional,
+    totalOptional,
+    missingRequired,
+  }
 }
 
 export function getBestTemplateMatch(
@@ -191,8 +284,80 @@ const templatePreviewStyles = `
   .empty { color: #A39E96; font-size: 14px; }
 `
 
-export function getTemplatePreviewStyles(): string {
+export function getTemplatePreviewStyles(templateType?: TemplateType): string {
+  if (templateType === "expressionFocused") {
+    return EXPRESSION_FOCUSED_CSS
+  }
+
   return templatePreviewStyles
+}
+
+function getRoleToFieldName(fieldMappings: Record<string, FieldRole>) {
+  const roleToFieldName: Partial<Record<FieldRole, string>> = {}
+
+  for (const [fieldName, role] of Object.entries(fieldMappings)) {
+    if (role !== "unknown" && !roleToFieldName[role]) {
+      roleToFieldName[role] = fieldName
+    }
+  }
+
+  return roleToFieldName
+}
+
+export function getExpressionFocusedMissingRoles(fieldMappings: Record<string, FieldRole>) {
+  const presentRoles = new Set(Object.values(fieldMappings))
+  const missing: string[] = []
+
+  if (!presentRoles.has("expression")) missing.push("Expression")
+  if (!presentRoles.has("reading")) missing.push("Reading")
+  if (!presentRoles.has("meaning")) missing.push("Meaning")
+  if (!presentRoles.has("sentence") && !presentRoles.has("sentenceReading")) {
+    missing.push("Sentence or Sentence reading")
+  }
+  if (!presentRoles.has("translation")) missing.push("Translation")
+
+  return missing
+}
+
+export function getExpressionFocusedAnkiTemplate({
+  fieldMappings,
+}: {
+  noteType: ParsedNoteType
+  fieldMappings: Record<string, FieldRole>
+}): { name: string; front: string; back: string; css: string } | null {
+  const roleToFieldName = getRoleToFieldName(fieldMappings)
+  const expression = roleToFieldName.expression
+  const reading = roleToFieldName.reading
+  const meaning = roleToFieldName.meaning
+  const sentence = roleToFieldName.sentenceReading ?? roleToFieldName.sentence
+  const translation = roleToFieldName.translation
+
+  if (!expression || !reading || !meaning || !sentence || !translation) {
+    return null
+  }
+
+  return {
+    name: TEMPLATES.expressionFocused.name,
+    front: `<div class="expression">{{${expression}}}</div>`,
+    back: `<div class="expression">
+  <div id="wordReading" class="noFurigana">{{furigana:${reading}}}</div>
+</div>
+
+<div class="meaning">{{${meaning}}}</div>
+
+<hr>
+
+<div id="sentReading" class="noFurigana sentence">{{furigana:${sentence}}}</div>
+<div class="sentence-en">{{${translation}}}</div>
+
+<script>
+setTimeout(function() {
+  document.getElementById("wordReading").classList.add("yesFurigana");
+  document.getElementById("sentReading").classList.add("yesFurigana");
+}, 3000);
+</script>`,
+    css: EXPRESSION_FOCUSED_CSS,
+  }
 }
 
 export function renderTemplatePreviewHtml({
@@ -226,11 +391,31 @@ export function renderTemplatePreviewHtml({
     return index >= 0 ? note.fieldValues[index] ?? "" : ""
   }
 
-  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  const esc = (s: string) =>
+    s
+      .replace(/&nbsp;/gi, "\u00a0")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
   const renderBlock = (role: FieldRole, className: string) => {
     const value = getValue(role)
     if (!value) return ""
     return `<div class="${className}">${esc(value)}</div>`
+  }
+
+  if (templateType === "expressionFocused") {
+    const focusedTemplate = getExpressionFocusedAnkiTemplate({ noteType, fieldMappings })
+
+    if (!focusedTemplate) {
+      const missing = getExpressionFocusedMissingRoles(fieldMappings).join(", ")
+      return `<p class="empty">Expression Focused needs mapped fields: ${esc(missing)}.</p>`
+    }
+
+    return renderAnkiTemplate({
+      template: face === "front" ? focusedTemplate.front : focusedTemplate.back,
+      note,
+      noteType,
+    })
   }
 
   if (templateType === "vocabulary") {

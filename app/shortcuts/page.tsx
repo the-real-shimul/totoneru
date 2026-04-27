@@ -1,12 +1,31 @@
-import { ArrowLeft, Keyboard } from "lucide-react"
-import Link from "next/link"
+import { Keyboard } from "lucide-react"
+
+import { DocsHeader } from "@/components/docs-header"
 
 export const metadata = {
   title: "Keyboard shortcuts — totoneru",
   description: "Keyboard shortcuts for totoneru.",
 }
 
-const shortcuts = [
+const appShortcuts = [
+  {
+    keys: ["↑"],
+    description: "Move block up in the block editor",
+    context: "Block editor",
+  },
+  {
+    keys: ["↓"],
+    description: "Move block down in the block editor",
+    context: "Block editor",
+  },
+  {
+    keys: ["Escape"],
+    description: "Close modal dialogs",
+    context: "Global",
+  },
+]
+
+const accessibilityShortcuts = [
   {
     keys: ["Tab"],
     description: "Move focus to next interactive element",
@@ -27,21 +46,6 @@ const shortcuts = [
     description: "Toggle checkbox or activate button",
     context: "Global",
   },
-  {
-    keys: ["Escape"],
-    description: "Close modal dialogs (onboarding overlay)",
-    context: "Global",
-  },
-  {
-    keys: ["↑"],
-    description: "Move block up in the block editor",
-    context: "Block editor",
-  },
-  {
-    keys: ["↓"],
-    description: "Move block down in the block editor",
-    context: "Block editor",
-  },
 ]
 
 export default function ShortcutsPage() {
@@ -53,19 +57,7 @@ export default function ShortcutsPage() {
       >
         Skip to content
       </a>
-      <header className="border-b border-border bg-background/90">
-        <div className="mx-auto flex max-w-6xl items-center gap-4 px-5 py-4 sm:px-6">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ArrowLeft className="size-4" />
-              <span className="text-[13px]">Back</span>
-            </Link>
-          </div>
-        </div>
-      </header>
+      <DocsHeader />
 
       <main id="main-content" className="mx-auto max-w-3xl px-5 py-10 sm:px-6 sm:py-16">
         <div className="mb-12">
@@ -80,34 +72,12 @@ export default function ShortcutsPage() {
           </p>
         </div>
 
-        <div className="space-y-2">
-          {shortcuts.map((shortcut, index) => (
-            <div
-              key={index}
-              className="flex items-start gap-4 rounded-[12px] border border-border bg-card px-5 py-4"
-            >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-muted">
-                <Keyboard className="size-5 text-foreground" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  {shortcut.keys.map((key, kidx) => (
-                    <span key={kidx}>
-                      <kbd className="rounded-[6px] border border-border bg-muted px-2 py-0.5 font-mono text-[12px] font-semibold text-foreground">
-                        {key}
-                      </kbd>
-                      {kidx < shortcut.keys.length - 1 && (
-                        <span className="mx-1 text-muted-foreground">+</span>
-                      )}
-                    </span>
-                  ))}
-                </div>
-                <p className="mt-1 text-[15px] text-foreground">{shortcut.description}</p>
-                <p className="text-[12px] text-muted-foreground">{shortcut.context}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+        <ShortcutGroup title="App shortcuts" shortcuts={appShortcuts} />
+        <ShortcutGroup
+          title="Browser and accessibility"
+          shortcuts={accessibilityShortcuts}
+          className="mt-8"
+        />
 
         <div className="mt-12 rounded-[20px] border border-border bg-card p-8 shadow-[0_1px_3px_rgba(26,26,26,0.03)]">
           <h2 className="text-[20px] font-medium text-foreground mb-4">
@@ -128,5 +98,49 @@ export default function ShortcutsPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+function ShortcutGroup({
+  title,
+  shortcuts,
+  className = "",
+}: {
+  title: string
+  shortcuts: Array<{ keys: string[]; description: string; context: string }>
+  className?: string
+}) {
+  return (
+    <section className={className}>
+      <h2 className="mb-3 text-[20px] font-medium text-foreground">{title}</h2>
+      <div className="space-y-2">
+        {shortcuts.map((shortcut, index) => (
+          <div
+            key={index}
+            className="flex items-start gap-4 rounded-[12px] border border-border bg-card px-5 py-4"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-muted">
+              <Keyboard className="size-5 text-foreground" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                {shortcut.keys.map((key, kidx) => (
+                  <span key={kidx}>
+                    <kbd className="rounded-[6px] border border-border bg-muted px-2 py-0.5 font-mono text-[12px] font-semibold text-foreground">
+                      {key}
+                    </kbd>
+                    {kidx < shortcut.keys.length - 1 && (
+                      <span className="mx-1 text-muted-foreground">+</span>
+                    )}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-1 text-[15px] text-foreground">{shortcut.description}</p>
+              <p className="text-[12px] text-muted-foreground">{shortcut.context}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }

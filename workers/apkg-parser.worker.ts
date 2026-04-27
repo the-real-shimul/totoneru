@@ -21,6 +21,7 @@ type NormalizedTemplateRow = [number, number, string, Uint8Array]
 type NormalizedNoteTypeRow = [number, string]
 type NotetypeJson = {
   name?: string
+  css?: string
   flds?: Array<{ name?: string }>
   tmpls?: Array<{
     name?: string
@@ -80,6 +81,7 @@ function parseNoteTypes(rawModelsJson: string): ParsedNoteType[] {
     .map(([id, noteType]) => ({
       id,
       name: noteType.name ?? `Note type ${id}`,
+      css: noteType.css ?? "",
       fieldNames: (noteType.flds ?? []).map(
         (field, index) => field.name ?? `Field ${index + 1}`
       ),
@@ -182,6 +184,7 @@ function parseNormalizedNoteTypes(database: initSqlJs.Database): ParsedNoteType[
       return {
         id: key,
         name,
+        css: "",
         fieldNames: fieldsByNoteType.get(key) ?? [],
         templates: templatesByNoteType.get(key) ?? [],
       }

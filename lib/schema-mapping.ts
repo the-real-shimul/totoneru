@@ -97,7 +97,10 @@ function scoreReading(fieldName: string, samples: string[]) {
   const reasons: string[] = []
   let score = 0
 
-  if (/(reading|kana|furigana|yomi)/.test(fieldName)) {
+  if (
+    /(reading|kana|furigana|yomi)/.test(fieldName) &&
+    !/(sentencereading|sentencekana|examplekana|例文読み)/.test(fieldName)
+  ) {
     score += 0.65
     reasons.push("field name matches reading")
   }
@@ -232,5 +235,4 @@ function mostlyLatin(samples: string[]) {
 
   return latin > japanese
 }
-
 

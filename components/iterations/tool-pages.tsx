@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 
 import { AiSettings } from "@/components/ai-settings"
@@ -16,17 +17,17 @@ import type { FieldRole } from "@/lib/schema-mapping"
 import type { TemplateType } from "@/lib/templates"
 import { DEFAULT_TRANSFORMATIONS } from "@/lib/transformations"
 import type { BatchResult } from "@/lib/batch-operations"
-import type { IterationId } from "@/lib/iteration-ui"
 
 const EMPTY_FIELD_MAPPINGS: Record<string, FieldRole> = {}
 
-export function ImportToolPage({ iteration = "a" }: { iteration?: IterationId }) {
+export function ImportToolPage() {
   return (
-    <ToolPageFrame iteration={iteration} station="Deck intake">
+    <ToolPageFrame station="Import">
       <EditorialSection
-        eyebrow="Import desk"
+        eyebrow=""
         title="Upload, backup, inspect."
         doc={docFor("/decks", "deck-import")}
+        className="border-t-0 pt-4"
       >
         <ApkgImportProbe />
       </EditorialSection>
@@ -34,9 +35,9 @@ export function ImportToolPage({ iteration = "a" }: { iteration?: IterationId })
   )
 }
 
-export function AddCardsToolPage({ iteration = "a" }: { iteration?: IterationId }) {
+export function AddCardsToolPage() {
   return (
-    <ToolPageFrame iteration={iteration} station="Card forge">
+    <ToolPageFrame station="Add Cards">
       <EditorialSection
         eyebrow="Manual cards"
         title="Create cards without leaving the UI."
@@ -48,7 +49,7 @@ export function AddCardsToolPage({ iteration = "a" }: { iteration?: IterationId 
   )
 }
 
-export function AiToolPage({ iteration = "a" }: { iteration?: IterationId }) {
+export function AiToolPage() {
   const [activeDeck, setActiveDeck] = useState<ActiveDeck | null>(null)
   const [selectedPrompt, setSelectedPrompt] = useState<UserPrompt | null>(null)
   const [showEditor, setShowEditor] = useState(false)
@@ -58,17 +59,17 @@ export function AiToolPage({ iteration = "a" }: { iteration?: IterationId }) {
   }, [])
 
   return (
-    <ToolPageFrame iteration={iteration} station="Prompt reactor">
+    <ToolPageFrame station="AI Transform">
       <EditorialSection
         eyebrow="AI transformation"
         title="Bring your own key. Keep the deck local."
         doc={docFor("/ai", "api-keys")}
       >
         <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
-          <div className="border-2 border-black p-5">
+          <div className="border border-black p-5">
             <AiSettings />
           </div>
-          <div className="border-2 border-black p-5">
+          <div className="border border-black p-5">
             {activeDeck ? (
               <div className="space-y-4">
                 <PromptLibrary
@@ -97,6 +98,8 @@ export function AiToolPage({ iteration = "a" }: { iteration?: IterationId }) {
               <EmptyState
                 title="Import a deck to preview prompts."
                 body="AI settings can be saved now, but prompt variables need a mapped sample card."
+                actionLabel="Go to Import"
+                actionHref="/import"
               />
             )}
           </div>
@@ -117,7 +120,7 @@ export function AiToolPage({ iteration = "a" }: { iteration?: IterationId }) {
   )
 }
 
-export function BatchToolPage({ iteration = "a" }: { iteration?: IterationId }) {
+export function BatchToolPage() {
   const [activeDeck, setActiveDeck] = useState<ActiveDeck | null>(null)
   const [batchResult, setBatchResult] = useState<BatchResult | null>(null)
 
@@ -140,15 +143,15 @@ export function BatchToolPage({ iteration = "a" }: { iteration?: IterationId }) 
   )
 
   return (
-    <ToolPageFrame iteration={iteration} station="Dry-run tunnel">
+    <ToolPageFrame station="Batch">
       <EditorialSection
         eyebrow="Batch editor"
-        title="Dry-run before the big red lever."
+        title="Preview changes before applying."
         doc={docFor("/ai", "batch")}
       >
         {activeDeck ? (
           <div className="grid gap-5 lg:grid-cols-[0.72fr_1.28fr]">
-            <div className="border-2 border-black p-5">
+            <div className="border border-black p-5">
               <StatRule label="Deck" value={activeDeck.fileName} />
               <div className="mt-4 grid grid-cols-2 gap-4">
                 <StatRule label="Notes" value={String(activeDeck.deck.noteCount)} />
@@ -159,7 +162,7 @@ export function BatchToolPage({ iteration = "a" }: { iteration?: IterationId }) 
                 writes only a downloaded copy.
               </p>
             </div>
-            <div className="border-2 border-black p-5">
+            <div className="border border-black p-5">
               <BatchRunner
                 activeDeck={activeDeck}
                 transformationConfigs={DEFAULT_TRANSFORMATIONS}
@@ -179,6 +182,8 @@ export function BatchToolPage({ iteration = "a" }: { iteration?: IterationId }) 
           <EmptyState
             title="No active deck yet."
             body="Import a deck first so the batch editor has parsed notes to stage."
+            actionLabel="Go to Import"
+            actionHref="/import"
           />
         )}
       </EditorialSection>
@@ -186,9 +191,9 @@ export function BatchToolPage({ iteration = "a" }: { iteration?: IterationId }) 
   )
 }
 
-export function ExportToolPage({ iteration = "a" }: { iteration?: IterationId }) {
+export function ExportToolPage() {
   return (
-    <ToolPageFrame iteration={iteration} station="Export hatch">
+    <ToolPageFrame station="Export">
       <EditorialSection
         eyebrow="Export options"
         title="APKG, CSV, TSV, original backup."
@@ -201,31 +206,19 @@ export function ExportToolPage({ iteration = "a" }: { iteration?: IterationId })
 }
 
 function ToolPageFrame({
-  iteration,
   station,
   children,
 }: {
-  iteration: IterationId
   station: string
   children: React.ReactNode
 }) {
-  if (iteration !== "b") {
-    return <div className="mx-auto max-w-[1500px] px-4 py-8 sm:px-6">{children}</div>
-  }
-
   return (
-    <div className="px-4 py-8 sm:px-6">
+    <div className="px-4 py-6 sm:px-6">
       <div className="mx-auto max-w-[1500px]">
-        <div className="mb-6 grid gap-4 lg:grid-cols-[0.78fr_1.22fr]">
-          <div className="rotate-[-1deg] border-2 border-black bg-black p-5 text-white">
-            <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-white/70">
-              Factory station
-            </p>
-            <h1 className="mt-2 text-[46px] font-black leading-[0.9] tracking-[-0.04em]">
-              {station}
-            </h1>
-          </div>
-          <div className="min-h-32 border-2 border-black bg-white" aria-hidden="true" />
+        <div className="mb-2 flex items-center justify-between">
+          <h1 className="text-[34px] font-black leading-none tracking-[-0.03em] sm:text-[46px]">
+            {station}
+          </h1>
         </div>
         <div className="bg-white">{children}</div>
       </div>
@@ -233,7 +226,17 @@ function ToolPageFrame({
   )
 }
 
-function EmptyState({ title, body }: { title: string; body: string }) {
+function EmptyState({
+  title,
+  body,
+  actionLabel,
+  actionHref,
+}: {
+  title: string
+  body: string
+  actionLabel?: string
+  actionHref?: string
+}) {
   return (
     <div className="border-2 border-black p-8">
       <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[#757575]">
@@ -241,6 +244,14 @@ function EmptyState({ title, body }: { title: string; body: string }) {
       </p>
       <h3 className="mt-2 text-[28px] font-black leading-none">{title}</h3>
       <p className="mt-3 max-w-xl text-[15px] leading-[1.5]">{body}</p>
+      {actionLabel && actionHref && (
+        <Link
+          href={actionHref}
+          className="mt-5 inline-flex min-h-11 items-center justify-center border-2 border-black bg-black px-4 py-2 text-[14px] font-bold text-white transition-colors hover:bg-white hover:text-black"
+        >
+          {actionLabel}
+        </Link>
+      )}
     </div>
   )
 }

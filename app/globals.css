@@ -191,8 +191,9 @@
 }
 
 .iteration-marquee {
-  display: inline-block;
-  min-width: 200%;
+  display: flex;
+  width: max-content;
+  will-change: transform;
   animation: editorial-marquee 18s linear infinite;
 }
 

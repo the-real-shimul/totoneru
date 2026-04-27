@@ -7,8 +7,8 @@ export const metadata = {
 
 export default function AiPage() {
   return (
-    <IterationShell iteration="b" active="ai" basePath="">
-      <AiToolPage iteration="b" />
+    <IterationShell active="ai">
+      <AiToolPage />
     </IterationShell>
   )
 }

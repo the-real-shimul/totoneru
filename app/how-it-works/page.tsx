@@ -1,5 +1,7 @@
-import { ArrowLeft, Database, Eye, KeyRound, Lock, Monitor, ShieldCheck, Workflow } from "lucide-react"
+import { Database, Eye, KeyRound, Lock, Monitor, ShieldCheck, Workflow } from "lucide-react"
 import Link from "next/link"
+
+import { DocsHeader } from "@/components/docs-header"
 
 export const metadata = {
   title: "How it works — totoneru",
@@ -53,19 +55,7 @@ export default function HowItWorksPage() {
       >
         Skip to content
       </a>
-      <header className="border-b border-border bg-background/90">
-        <div className="mx-auto flex max-w-6xl items-center gap-4 px-5 py-4 sm:px-6">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ArrowLeft className="size-4" />
-              <span className="text-[13px]">Back</span>
-            </Link>
-          </div>
-        </div>
-      </header>
+      <DocsHeader />
 
       <main id="main-content" className="mx-auto max-w-3xl px-5 py-10 sm:px-6 sm:py-16">
         <div className="mb-12">

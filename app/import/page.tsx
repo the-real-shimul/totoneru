@@ -7,8 +7,8 @@ export const metadata = {
 
 export default function ImportPage() {
   return (
-    <IterationShell iteration="b" active="import" basePath="">
-      <ImportToolPage iteration="b" />
+    <IterationShell active="import">
+      <ImportToolPage />
     </IterationShell>
   )
 }

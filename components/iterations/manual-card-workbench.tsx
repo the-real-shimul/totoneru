@@ -132,7 +132,7 @@ export function ManualCardWorkbench() {
           <p className="font-mono text-[12px] uppercase tracking-[0.12em] text-[#757575]">
             Select a card
           </p>
-          <p className="mt-2 text-[24px] font-black">The editor waits for an expression.</p>
+          <p className="mt-2 text-[24px] font-black">Add an expression above to start editing.</p>
         </div>
       )}
     </div>
@@ -178,6 +178,7 @@ function ManualCardEditor({
           endpoint: key.endpoint,
           apiKey: key.apiKey,
           model: key.model,
+          provider: key.provider,
         },
         messages: [
           {

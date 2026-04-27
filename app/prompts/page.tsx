@@ -1,6 +1,7 @@
-import { ArrowLeft, BookOpen } from "lucide-react"
+import { BookOpen } from "lucide-react"
 import Link from "next/link"
 
+import { DocsHeader } from "@/components/docs-header"
 import { CURATED_PROMPTS } from "@/lib/prompts"
 
 export const metadata = {
@@ -17,21 +18,9 @@ export default function PromptCookbookPage() {
       >
         Skip to content
       </a>
-      <header className="border-b border-border bg-background/90">
-        <div className="mx-auto flex max-w-6xl items-center gap-4 px-5 py-4 sm:px-6">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ArrowLeft className="size-4" />
-              <span className="text-[13px]">Back</span>
-            </Link>
-          </div>
-        </div>
-      </header>
+      <DocsHeader />
 
-      <main id="main-content" className="mx-auto max-w-3xl px-5 py-10 sm:px-6 sm:py-16">
+      <main id="main-content" className="mx-auto max-w-6xl px-5 py-10 sm:px-6 sm:py-16">
         <div className="mb-12">
           <p className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             Documentation
@@ -44,11 +33,11 @@ export default function PromptCookbookPage() {
           </p>
         </div>
 
-        <div className="space-y-8">
+        <div className="grid gap-4 lg:grid-cols-2">
           {CURATED_PROMPTS.map((prompt, index) => (
             <section
               key={prompt.id}
-              className="rounded-[20px] border border-border bg-card p-8 shadow-[0_1px_3px_rgba(26,26,26,0.03)]"
+              className="rounded-[12px] border border-border bg-card p-5 shadow-[0_1px_3px_rgba(26,26,26,0.03)]"
             >
               <div className="flex items-start gap-4">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-muted">
@@ -69,29 +58,25 @@ export default function PromptCookbookPage() {
                 </div>
               </div>
 
-              <div className="mt-6 space-y-4">
+              <div className="mt-5 space-y-3">
                 {prompt.systemMessage && (
-                  <div>
-                    <p className="mb-1 font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                  <details className="rounded-[8px] border border-border bg-background/60 px-4 py-3">
+                    <summary className="cursor-pointer font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
                       System message
+                    </summary>
+                    <p className="mt-3 whitespace-pre-wrap text-[13px] leading-[1.55] text-foreground">
+                      {prompt.systemMessage}
                     </p>
-                    <div className="rounded-[8px] border border-border bg-background/60 px-4 py-3">
-                      <p className="whitespace-pre-wrap text-[13px] text-foreground leading-[1.55]">
-                        {prompt.systemMessage}
-                      </p>
-                    </div>
-                  </div>
+                  </details>
                 )}
 
-                <div>
-                  <p className="mb-1 font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                <div className="rounded-[8px] border border-border bg-background/60 px-4 py-3">
+                  <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
                     User message
                   </p>
-                  <div className="rounded-[8px] border border-border bg-background/60 px-4 py-3">
-                    <p className="whitespace-pre-wrap text-[13px] text-foreground leading-[1.55]">
-                      {prompt.userMessage}
-                    </p>
-                  </div>
+                  <p className="mt-2 line-clamp-5 whitespace-pre-wrap text-[13px] leading-[1.55] text-foreground">
+                    {prompt.userMessage}
+                  </p>
                 </div>
 
                 <div>

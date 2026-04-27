@@ -7,8 +7,8 @@ export const metadata = {
 
 export default function ExportPage() {
   return (
-    <IterationShell iteration="b" active="export" basePath="">
-      <ExportToolPage iteration="b" />
+    <IterationShell active="export">
+      <ExportToolPage />
     </IterationShell>
   )
 }

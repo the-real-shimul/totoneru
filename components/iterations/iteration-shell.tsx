@@ -4,37 +4,24 @@ import {
   DocumentationProvider,
   DocumentationToggle,
 } from "@/components/iterations/documentation-toggle"
-import { TypewriterRibbon } from "@/components/iterations/typewriter-ribbon"
-import {
-  getIterationNav,
-  ITERATIONS,
-  type IterationId,
-  type IterationPageKey,
-} from "@/lib/iteration-ui"
+import { getIterationNav, type IterationPageKey } from "@/lib/iteration-ui"
 import { cn } from "@/lib/utils"
 
 export function IterationShell({
-  iteration,
   active,
-  basePath,
   children,
 }: {
-  iteration: IterationId
   active: IterationPageKey
-  basePath?: string
   children: React.ReactNode
 }) {
-  const tone = ITERATIONS[iteration]
-  const nav = getIterationNav(iteration, basePath)
-  const isCanonical = basePath === ""
-  const eyebrow = isCanonical ? "totoneru / kinetic lab" : `totoneru / ${tone.name}`
+  const nav = getIterationNav()
 
   return (
     <DocumentationProvider>
       <div
         className={cn(
           "min-h-svh bg-white text-[#1a1a1a]",
-          tone.silly && "iteration-silly"
+          "iteration-silly"
         )}
       >
         <a
@@ -45,9 +32,9 @@ export function IterationShell({
         </a>
         <header className="border-b-2 border-black bg-white text-black">
           <div className="mx-auto grid max-w-[1500px] gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
-            <Link href={basePath === "" ? "/" : (basePath ?? `/iterations/${iteration}`)} className="group">
-              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[#757575]">
-                {eyebrow}
+            <Link href="/" className="group">
+              <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[#757575]">
+                totoneru / kinetic lab
               </p>
               <p className="text-[26px] font-black leading-none tracking-[-0.02em] group-hover:text-[#057dbc]">
                 TOTONERU
@@ -77,7 +64,6 @@ export function IterationShell({
             </div>
           </div>
         </header>
-        {tone.silly && <TypewriterRibbon />}
         <main id="main-content">{children}</main>
       </div>
     </DocumentationProvider>

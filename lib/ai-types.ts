@@ -7,6 +7,7 @@ export type AiAdapterConfig = {
   endpoint: string
   apiKey: string
   model: string
+  provider: AiProvider
 }
 
 export type AiAdapter = {
@@ -14,8 +15,10 @@ export type AiAdapter = {
   send(messages: AiMessage[], config: AiAdapterConfig): Promise<string>
 }
 
-export type AiProvider = "groq"
+export type AiProvider = "openai" | "anthropic" | "groq"
 
 export const AI_PROVIDERS: { id: AiProvider; name: string }[] = [
+  { id: "openai", name: "OpenAI-compatible" },
+  { id: "anthropic", name: "Anthropic" },
   { id: "groq", name: "Groq" },
 ]

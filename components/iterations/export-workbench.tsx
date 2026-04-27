@@ -12,7 +12,6 @@ import {
 import { loadBackupData, loadMostRecentActiveDeck } from "@/lib/deck-storage"
 import type { ActiveDeck } from "@/lib/deck-model"
 import { downloadBuffer } from "@/lib/download"
-import { exportFormats } from "@/lib/iteration-ui"
 import { listManualWords, type ManualWord } from "@/lib/manual-words"
 import { DEFAULT_TRANSFORMATIONS } from "@/lib/transformations"
 
@@ -46,25 +45,21 @@ export function ExportWorkbench() {
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)]">
       <div className="border-2 border-black p-5">
         <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[#757575]">
           Export desk
         </p>
         <h3 className="mt-1 text-[30px] font-black leading-none tracking-[-0.02em]">
-          APKG, CSV, TSV.
+          Choose the file you need.
         </h3>
-        <div className="mt-5 divide-y divide-black border-y-2 border-black">
-          {exportFormats.map((format) => (
-            <div key={format.label} className="py-3">
-              <p className="font-mono text-[12px] font-bold uppercase tracking-[0.1em]">
-                {format.label}
-              </p>
-              <p className="mt-1 text-[14px] leading-[1.45] text-[#4a4a4a]">
-                {format.detail}
-              </p>
-            </div>
-          ))}
+        <p className="mt-4 text-[15px] leading-[1.5] text-[#4a4a4a]">
+          Export a transformed copy of the imported deck, download the untouched backup, or create
+          files from manual cards.
+        </p>
+        <div className="mt-5 grid grid-cols-2 gap-4 border-t-2 border-black pt-4">
+          <Stat label="Deck cards" value={activeDeck ? String(activeDeck.deck.noteCount) : "0"} />
+          <Stat label="Manual cards" value={String(manualWords.length)} />
         </div>
       </div>
 
@@ -74,7 +69,7 @@ export function ExportWorkbench() {
             title="Transformed deck"
             detail={
               activeDeck
-                ? `${activeDeck.fileName} plus ${deckMergeCount} staged manual cards`
+                ? `Copy of ${activeDeck.fileName} with staged changes and ${deckMergeCount} deck-targeted manual cards`
                 : "Import a deck first"
             }
             disabled={!activeDeck}
@@ -100,7 +95,7 @@ export function ExportWorkbench() {
           />
           <ExportAction
             title="Original backup"
-            detail={activeDeck ? "Untouched import backup" : "Import a deck first"}
+            detail={activeDeck ? "The untouched .apkg saved before parsing" : "Import a deck first"}
             disabled={!activeDeck}
             loading={isExporting === "Original APKG"}
             onClick={() =>
@@ -113,8 +108,12 @@ export function ExportWorkbench() {
             }
           />
           <ExportAction
-            title="Standalone APKG"
-            detail={`${standaloneCount} manual cards targeted`}
+            title="Manual-card APKG"
+            detail={
+              standaloneCount > 0
+                ? `${standaloneCount} manual cards in a new Anki package`
+                : "Add standalone manual cards first"
+            }
             disabled={standaloneCount === 0}
             loading={isExporting === "Standalone APKG"}
             onClick={() =>
@@ -126,7 +125,11 @@ export function ExportWorkbench() {
           />
           <ExportAction
             title="CSV"
-            detail="UTF-8, quoted, Anki import-friendly"
+            detail={
+              standaloneCount > 0
+                ? "Quoted UTF-8 text for Anki or spreadsheets"
+                : "Add standalone manual cards first"
+            }
             disabled={standaloneCount === 0}
             loading={isExporting === "CSV"}
             onClick={() =>
@@ -138,7 +141,11 @@ export function ExportWorkbench() {
           />
           <ExportAction
             title="TSV"
-            detail="UTF-8, tab-separated"
+            detail={
+              standaloneCount > 0
+                ? "Tab-separated UTF-8 text for simple imports"
+                : "Add standalone manual cards first"
+            }
             disabled={standaloneCount === 0}
             loading={isExporting === "TSV"}
             onClick={() =>
@@ -157,6 +164,17 @@ export function ExportWorkbench() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[#757575]">
+        {label}
+      </p>
+      <p className="mt-1 font-mono text-[24px] font-black">{value}</p>
     </div>
   )
 }

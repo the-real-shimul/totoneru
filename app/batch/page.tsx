@@ -7,8 +7,8 @@ export const metadata = {
 
 export default function BatchPage() {
   return (
-    <IterationShell iteration="b" active="batch" basePath="">
-      <BatchToolPage iteration="b" />
+    <IterationShell active="batch">
+      <BatchToolPage />
     </IterationShell>
   )
 }

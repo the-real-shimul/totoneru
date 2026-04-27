@@ -7,8 +7,8 @@ export const metadata = {
 
 export default function AddCardsPage() {
   return (
-    <IterationShell iteration="b" active="add" basePath="">
-      <AddCardsToolPage iteration="b" />
+    <IterationShell active="add">
+      <AddCardsToolPage />
     </IterationShell>
   )
 }

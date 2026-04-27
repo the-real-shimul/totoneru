@@ -11,16 +11,12 @@ import {
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
-export type IterationId = "a" | "b"
-
-export type IterationTone = {
-  id: IterationId
+export type SiteTone = {
   name: string
   eyebrow: string
   headline: string
   deck: string
   footerNote: string
-  silly: boolean
 }
 
 export type IterationPageKey = "home" | "import" | "add" | "ai" | "batch" | "export"
@@ -32,35 +28,17 @@ export type IterationNavItem = {
   icon: LucideIcon
 }
 
-export const ITERATIONS: Record<IterationId, IterationTone> = {
-  a: {
-    id: "a",
-    name: "Iteration A",
-    eyebrow: "Strict editorial",
-    headline: "Anki deck surgery, set like front-page news.",
-    deck:
-      "A restrained WIRED-inspired pass: sharp rules, dense sections, square controls, and motion that behaves like a printing press.",
-    footerNote:
-      "Iteration A keeps the product sober: deck trust, local processing, and export confidence come first.",
-    silly: false,
-  },
-  b: {
-    id: "b",
-    name: "Iteration B",
-    eyebrow: "Kinetic lab",
-    headline: "A tiny newspaper machine for unruly flashcards.",
-    deck:
-      "Same local-first workflow, but the interface lets type strips wiggle, stamps smack, and cards march through the machine.",
-    footerNote:
-      "Iteration B is playful, but the data rules stay boring: no server deck storage, no surprise writes.",
-    silly: true,
-  },
+export const SITE_TONE: SiteTone = {
+  name: "Kinetic lab",
+  eyebrow: "Kinetic lab",
+  headline: "A tiny newspaper machine for unruly flashcards.",
+  deck:
+    "For Japanese learners who obsess over cards. Manually build, AI-transform, or import decks of Anki flashcards entirely in your browser.",
+  footerNote:
+    "totoneru is playful, but the data rules stay boring: no server deck storage, no surprise writes.",
 }
 
-export function getIterationNav(
-  iteration: IterationId,
-  base = `/iterations/${iteration}`
-): IterationNavItem[] {
+export function getIterationNav(base = ""): IterationNavItem[] {
   return [
     { key: "home", label: "Front Page", href: base || "/", icon: LibraryBig },
     { key: "import", label: "Import", href: `${base}/import`, icon: Upload },
