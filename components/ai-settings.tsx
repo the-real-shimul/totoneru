@@ -12,7 +12,10 @@ import {
 } from "@/lib/ai-keys"
 import { AI_PROVIDERS, type AiProvider } from "@/lib/ai-types"
 
-const PROVIDER_DEFAULTS: Record<AiProvider, { endpoint: string; model: string; label: string }> = {
+const PROVIDER_DEFAULTS: Record<
+  AiProvider,
+  { endpoint: string; model: string; label: string }
+> = {
   openai: {
     endpoint: "https://api.openai.com/v1/chat/completions",
     model: "gpt-4o-mini",
@@ -46,7 +49,9 @@ export function AiSettings() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[16px] font-medium text-[#1a1a1a]">AI provider keys</p>
+          <p className="text-[16px] font-medium text-[#1a1a1a]">
+            AI provider keys
+          </p>
           <p className="text-[13px] text-[#757575]">
             Stored locally. Never sent to our servers.
           </p>
@@ -91,7 +96,56 @@ export function AiSettings() {
           ))}
         </div>
       )}
+
+      <GroqKeyGuide />
     </div>
+  )
+}
+
+function GroqKeyGuide() {
+  return (
+    <section className="border-2 border-black bg-white p-4">
+      <p className="font-mono text-[11px] font-bold tracking-[0.12em] text-[#757575] uppercase">
+        Free Groq key
+      </p>
+      <h3 className="mt-1 text-[20px] leading-none font-black">
+        How to get a free key
+      </h3>
+      <ol className="mt-3 list-decimal space-y-2 pl-5 text-[14px] leading-[1.45] text-[#4a4a4a]">
+        <li>
+          Open{" "}
+          <a
+            href="https://console.groq.com/keys"
+            target="_blank"
+            rel="noreferrer"
+            className="font-bold underline"
+          >
+            Groq API Keys
+          </a>{" "}
+          and sign in or create a Groq account.
+        </li>
+        <li>
+          Click Create API Key, copy the generated key, and paste it above.
+        </li>
+        <li>
+          Keep the default Groq settings unless you need a different model or
+          endpoint.
+        </li>
+      </ol>
+      <p className="mt-3 text-[13px] leading-[1.45] text-[#757575]">
+        Groq has a Free plan for building and testing. Usage is capped by rate
+        limits, so check{" "}
+        <a
+          href="https://console.groq.com/docs/rate-limits"
+          target="_blank"
+          rel="noreferrer"
+          className="font-bold underline"
+        >
+          Groq rate limits
+        </a>{" "}
+        if requests start failing with 429 errors.
+      </p>
+    </section>
   )
 }
 
@@ -146,56 +200,13 @@ function AddKeyForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="border-2 border-black bg-white p-5 space-y-3"
+      className="space-y-3 border-2 border-black bg-white p-5"
     >
       <div>
-        <label htmlFor={providerId} className="block text-[13px] font-medium text-[#1a1a1a] mb-1">
-          Provider
-        </label>
-        <select
-          id={providerId}
-          value={provider}
-          onChange={(event) => handleProviderChange(event.target.value as AiProvider)}
-          className="w-full border-2 border-black bg-white px-3 py-2 text-[14px] text-[#1a1a1a] outline-none"
+        <label
+          htmlFor={apiKeyId}
+          className="mb-1 block text-[13px] font-medium text-[#1a1a1a]"
         >
-          {AI_PROVIDERS.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <label htmlFor={endpointId} className="block text-[13px] font-medium text-[#1a1a1a] mb-1">
-          Endpoint URL
-        </label>
-        <input
-          id={endpointId}
-          type="url"
-          value={endpoint}
-          onChange={(event) => setEndpoint(event.target.value)}
-          required
-          className="w-full border-2 border-black bg-white px-3 py-2 text-[14px] text-[#1a1a1a] outline-none"
-        />
-      </div>
-
-      <div>
-        <label htmlFor={modelId} className="block text-[13px] font-medium text-[#1a1a1a] mb-1">
-          Model
-        </label>
-        <input
-          id={modelId}
-          type="text"
-          value={model}
-          onChange={(event) => setModel(event.target.value)}
-          required
-          className="w-full border-2 border-black bg-white px-3 py-2 text-[14px] text-[#1a1a1a] outline-none"
-        />
-      </div>
-
-      <div>
-        <label htmlFor={apiKeyId} className="block text-[13px] font-medium text-[#1a1a1a] mb-1">
           API key
         </label>
         <div className="flex gap-2">
@@ -218,21 +229,92 @@ function AddKeyForm({
             {showKey ? <EyeOff /> : <Eye />}
           </Button>
         </div>
+        <p className="mt-2 text-[12px] leading-[1.4] text-[#757575]">
+          Uses Groq free-tier defaults. Open Advanced to change provider,
+          endpoint, model, or label.
+        </p>
       </div>
 
-      <div>
-        <label htmlFor={labelId} className="block text-[13px] font-medium text-[#1a1a1a] mb-1">
-          Label (optional)
-        </label>
-        <input
-          id={labelId}
-          type="text"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          placeholder={PROVIDER_DEFAULTS[provider].label}
-          className="w-full border-2 border-black bg-white px-3 py-2 text-[14px] text-[#1a1a1a] outline-none"
-        />
-      </div>
+      <details className="border-2 border-black bg-white">
+        <summary className="cursor-pointer px-3 py-2 font-mono text-[11px] font-bold tracking-[0.1em] text-[#1a1a1a] uppercase">
+          Advanced options
+        </summary>
+        <div className="grid gap-3 border-t-2 border-black p-3">
+          <div>
+            <label
+              htmlFor={providerId}
+              className="mb-1 block text-[13px] font-medium text-[#1a1a1a]"
+            >
+              Provider
+            </label>
+            <select
+              id={providerId}
+              value={provider}
+              onChange={(event) =>
+                handleProviderChange(event.target.value as AiProvider)
+              }
+              className="w-full border-2 border-black bg-white px-3 py-2 text-[14px] text-[#1a1a1a] outline-none"
+            >
+              {AI_PROVIDERS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label
+              htmlFor={endpointId}
+              className="mb-1 block text-[13px] font-medium text-[#1a1a1a]"
+            >
+              Endpoint URL
+            </label>
+            <input
+              id={endpointId}
+              type="url"
+              value={endpoint}
+              onChange={(event) => setEndpoint(event.target.value)}
+              required
+              className="w-full border-2 border-black bg-white px-3 py-2 text-[14px] text-[#1a1a1a] outline-none"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor={modelId}
+              className="mb-1 block text-[13px] font-medium text-[#1a1a1a]"
+            >
+              Model
+            </label>
+            <input
+              id={modelId}
+              type="text"
+              value={model}
+              onChange={(event) => setModel(event.target.value)}
+              required
+              className="w-full border-2 border-black bg-white px-3 py-2 text-[14px] text-[#1a1a1a] outline-none"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor={labelId}
+              className="mb-1 block text-[13px] font-medium text-[#1a1a1a]"
+            >
+              Label (optional)
+            </label>
+            <input
+              id={labelId}
+              type="text"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder={PROVIDER_DEFAULTS[provider].label}
+              className="w-full border-2 border-black bg-white px-3 py-2 text-[14px] text-[#1a1a1a] outline-none"
+            />
+          </div>
+        </div>
+      </details>
 
       <div className="flex gap-2 pt-1">
         <Button type="submit" disabled={isSaving}>
@@ -259,21 +341,21 @@ function KeyRow({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-2 border-black bg-white px-4 py-3">
       <div className="min-w-0">
-        <p className="text-[14px] font-medium text-[#1a1a1a] truncate">
+        <p className="truncate text-[14px] font-medium text-[#1a1a1a]">
           {storedKey.label}
         </p>
-        <p className="font-mono text-[12px] text-[#757575] truncate">
+        <p className="truncate font-mono text-[12px] text-[#757575]">
           {PROVIDER_NAMES[storedKey.provider]} / {storedKey.model}
         </p>
-        <p className="font-mono text-[11px] text-[#757575] truncate">
+        <p className="truncate font-mono text-[11px] text-[#757575]">
           {storedKey.endpoint}
         </p>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex shrink-0 items-center gap-2">
         <button
           type="button"
           onClick={() => setShowKey((s) => !s)}
-          className="p-1.5 text-[#757575] hover:text-[#1a1a1a] transition-colors"
+          className="p-1.5 text-[#757575] transition-colors hover:text-[#1a1a1a]"
           aria-label={showKey ? "Hide key" : "Show key"}
         >
           {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -281,15 +363,15 @@ function KeyRow({
         <button
           type="button"
           onClick={onDelete}
-          className="p-1.5 text-[#757575] hover:text-[#A8321A] transition-colors"
+          className="p-1.5 text-[#757575] transition-colors hover:text-[#A8321A]"
           aria-label="Delete key"
         >
           <Trash2 className="size-4" />
         </button>
       </div>
       {showKey && (
-        <div className="basis-full mt-2">
-          <p className="font-mono text-[11px] text-[#757575] break-all">
+        <div className="mt-2 basis-full">
+          <p className="font-mono text-[11px] break-all text-[#757575]">
             {storedKey.apiKey}
           </p>
         </div>

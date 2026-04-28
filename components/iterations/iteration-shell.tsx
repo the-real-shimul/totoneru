@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { Bot, Keyboard } from "lucide-react"
 
 import {
   DocumentationProvider,
@@ -9,20 +10,30 @@ import { cn } from "@/lib/utils"
 
 export function IterationShell({
   active,
+  docsActive,
+  showHelpToggle = true,
   children,
 }: {
-  active: IterationPageKey
+  active?: IterationPageKey
+  docsActive?: "prompts" | "shortcuts"
+  showHelpToggle?: boolean
   children: React.ReactNode
 }) {
   const nav = getIterationNav()
+  const docsNav = [
+    { key: "prompts", label: "Prompts", href: "/prompts", icon: Bot },
+    {
+      key: "shortcuts",
+      label: "Shortcuts",
+      href: "/shortcuts",
+      icon: Keyboard,
+    },
+  ] as const
 
   return (
     <DocumentationProvider>
       <div
-        className={cn(
-          "min-h-svh bg-white text-[#1a1a1a]",
-          "iteration-silly"
-        )}
+        className={cn("min-h-svh bg-white text-[#1a1a1a]", "iteration-silly")}
       >
         <a
           href="#main-content"
@@ -33,10 +44,10 @@ export function IterationShell({
         <header className="border-b-2 border-black bg-white text-black">
           <div className="mx-auto grid max-w-[1500px] gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
             <Link href="/" className="group">
-              <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[#757575]">
-                totoneru / kinetic lab
+              <p className="font-mono text-[11px] font-bold tracking-[0.12em] text-[#757575] uppercase">
+                Client-side Anki tools
               </p>
-              <p className="text-[26px] font-black leading-none tracking-[-0.02em] group-hover:text-[#057dbc]">
+              <p className="text-[26px] leading-none font-black tracking-[-0.02em] group-hover:underline">
                 TOTONERU
               </p>
             </Link>
@@ -49,7 +60,7 @@ export function IterationShell({
                     key={item.key}
                     href={item.href}
                     className={cn(
-                      "inline-flex min-h-11 items-center gap-1 border-2 border-transparent px-3 py-2 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors hover:border-black hover:text-[#057dbc]",
+                      "inline-flex min-h-11 items-center gap-1 border-2 border-transparent px-3 py-2 font-mono text-[11px] tracking-[0.08em] uppercase transition-colors hover:border-black hover:text-[#057dbc]",
                       selected && "border-black bg-black text-white"
                     )}
                   >
@@ -59,8 +70,25 @@ export function IterationShell({
                 )
               })}
             </nav>
-            <div className="flex items-center gap-2 lg:justify-end">
-              <DocumentationToggle />
+            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+              {docsNav.map((item) => {
+                const Icon = item.icon
+                const selected = item.key === docsActive
+                return (
+                  <Link
+                    key={item.key}
+                    href={item.href}
+                    className={cn(
+                      "inline-flex min-h-10 items-center gap-1 border-2 border-transparent px-2.5 py-2 font-mono text-[10px] tracking-[0.08em] uppercase transition-colors hover:border-black",
+                      selected && "border-black bg-black text-white"
+                    )}
+                  >
+                    <Icon className="size-3.5" />
+                    {item.label}
+                  </Link>
+                )
+              })}
+              {showHelpToggle && <DocumentationToggle />}
             </div>
           </div>
         </header>

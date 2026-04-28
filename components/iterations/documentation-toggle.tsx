@@ -11,9 +11,15 @@ type DocumentationContextValue = {
   setEnabled: (enabled: boolean) => void
 }
 
-const DocumentationContext = createContext<DocumentationContextValue | null>(null)
+const DocumentationContext = createContext<DocumentationContextValue | null>(
+  null
+)
 
-export function DocumentationProvider({ children }: { children: React.ReactNode }) {
+export function DocumentationProvider({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   const [enabled, setEnabled] = useState(false)
   const value = useMemo(() => ({ enabled, setEnabled }), [enabled])
 
@@ -27,7 +33,9 @@ export function DocumentationProvider({ children }: { children: React.ReactNode 
 export function useDocumentation() {
   const context = useContext(DocumentationContext)
   if (!context) {
-    throw new Error("useDocumentation must be used inside DocumentationProvider")
+    throw new Error(
+      "useDocumentation must be used inside DocumentationProvider"
+    )
   }
   return context
 }
@@ -45,7 +53,7 @@ export function DocumentationToggle() {
       className="rounded-none border-2 border-black bg-white text-black hover:bg-black hover:text-white"
     >
       {enabled ? <X /> : <BookOpen />}
-      {enabled ? "Hide docs" : "Documentation"}
+      {enabled ? "Hide help" : "Help"}
     </Button>
   )
 }
@@ -56,8 +64,8 @@ export function DocumentationPanel({ item }: { item: HelpDocItem }) {
 
   return (
     <aside className="mt-4 border-2 border-black bg-white p-4 text-black">
-      <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em]">
-        Documentation / {item.id}
+      <p className="font-mono text-[11px] font-bold tracking-[0.12em] uppercase">
+        Help / {item.id}
       </p>
       <h3 className="mt-2 text-[18px] font-bold">{item.title}</h3>
       <dl className="mt-3 grid gap-3 text-[13px] leading-[1.45] sm:grid-cols-2">
@@ -75,7 +83,7 @@ export function DocumentationPanel({ item }: { item: HelpDocItem }) {
 function DocLine({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-[#757575]">
+      <dt className="font-mono text-[10px] font-bold tracking-[0.12em] text-[#757575] uppercase">
         {label}
       </dt>
       <dd className="mt-1">{value}</dd>

@@ -6,7 +6,11 @@ import { useCallback, useEffect, useState } from "react"
 import { AiSettings } from "@/components/ai-settings"
 import { BatchRunner } from "@/components/batch-runner"
 import { ApkgImportProbe } from "@/components/apkg-import-probe"
-import { EditorialSection, StatRule, docFor } from "@/components/iterations/editorial-primitives"
+import {
+  EditorialSection,
+  StatRule,
+  docFor,
+} from "@/components/iterations/editorial-primitives"
 import { ExportWorkbench } from "@/components/iterations/export-workbench"
 import { ManualCardWorkbench } from "@/components/iterations/manual-card-workbench"
 import { PromptEditor, PromptLibrary } from "@/components/prompt-library"
@@ -24,10 +28,9 @@ export function ImportToolPage() {
   return (
     <ToolPageFrame station="Import">
       <EditorialSection
-        eyebrow=""
+        eyebrow="Deck import"
         title="Upload, backup, inspect."
         doc={docFor("/decks", "deck-import")}
-        className="border-t-0 pt-4"
       >
         <ApkgImportProbe />
       </EditorialSection>
@@ -40,7 +43,7 @@ export function AddCardsToolPage() {
     <ToolPageFrame station="Add Cards">
       <EditorialSection
         eyebrow="Manual cards"
-        title="Create cards without leaving the UI."
+        title="Create cards manually."
         doc={docFor("/decks", "manual-words")}
       >
         <ManualCardWorkbench />
@@ -59,12 +62,17 @@ export function AiToolPage() {
   }, [])
 
   return (
-    <ToolPageFrame station="AI Transform">
+    <ToolPageFrame station="AI">
       <EditorialSection
         eyebrow="AI transformation"
-        title="Bring your own key. Keep the deck local."
+        title="Configure AI and select prompts."
         doc={docFor("/ai", "api-keys")}
       >
+        <div className="mb-4 grid gap-3 border-2 border-black p-4 font-mono text-[11px] font-bold tracking-[0.1em] uppercase sm:grid-cols-3">
+          <p>1. Save provider key</p>
+          <p>2. Import and map a deck</p>
+          <p>3. Select or create a prompt</p>
+        </div>
         <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
           <div className="border border-black p-5">
             <AiSettings />
@@ -79,7 +87,7 @@ export function AiToolPage() {
                 <button
                   type="button"
                   onClick={() => setShowEditor((value) => !value)}
-                  className="border-2 border-black px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.1em] hover:bg-black hover:text-white"
+                  className="border-2 border-black px-3 py-2 font-mono text-[11px] font-bold tracking-[0.1em] uppercase hover:bg-black hover:text-white"
                 >
                   {showEditor ? "Close prompt editor" : "Create custom prompt"}
                 </button>
@@ -107,11 +115,11 @@ export function AiToolPage() {
       </EditorialSection>
       <EditorialSection
         eyebrow="Prompt docs"
-        title="What gets sent."
+        title="How API calls work."
         doc={docFor("/ai", "prompts")}
       >
         <div className="grid gap-4 sm:grid-cols-3">
-          <StatRule label="Request path" value="Browser → provider" />
+          <StatRule label="Request path" value="Browser to provider" />
           <StatRule label="Key storage" value="IndexedDB" />
           <StatRule label="Server proxy" value="None" />
         </div>
@@ -130,15 +138,17 @@ export function BatchToolPage() {
 
   const getFieldMappings = useCallback(
     (noteTypeId: string): Record<string, FieldRole> =>
-      activeDeck?.noteTypeMappings.find((mapping) => mapping.noteTypeId === noteTypeId)
-        ?.fieldMappings ?? EMPTY_FIELD_MAPPINGS,
+      activeDeck?.noteTypeMappings.find(
+        (mapping) => mapping.noteTypeId === noteTypeId
+      )?.fieldMappings ?? EMPTY_FIELD_MAPPINGS,
     [activeDeck]
   )
 
   const getTemplateSelection = useCallback(
     (noteTypeId: string): TemplateType =>
-      activeDeck?.noteTypeMappings.find((mapping) => mapping.noteTypeId === noteTypeId)
-        ?.templateSelection ?? "none",
+      activeDeck?.noteTypeMappings.find(
+        (mapping) => mapping.noteTypeId === noteTypeId
+      )?.templateSelection ?? "none",
     [activeDeck]
   )
 
@@ -154,12 +164,18 @@ export function BatchToolPage() {
             <div className="border border-black p-5">
               <StatRule label="Deck" value={activeDeck.fileName} />
               <div className="mt-4 grid grid-cols-2 gap-4">
-                <StatRule label="Notes" value={String(activeDeck.deck.noteCount)} />
-                <StatRule label="Sample cards" value={String(activeDeck.deck.sampleNotes.length)} />
+                <StatRule
+                  label="Notes"
+                  value={String(activeDeck.deck.noteCount)}
+                />
+                <StatRule
+                  label="Sample cards"
+                  value={String(activeDeck.deck.sampleNotes.length)}
+                />
               </div>
               <p className="mt-5 text-[14px] leading-[1.45]">
-                Batch output is staged in IndexedDB. Export reads from the original backup and
-                writes only a downloaded copy.
+                Run a dry-run first, review the changed cards, then apply only
+                the edits you want to export.
               </p>
             </div>
             <div className="border border-black p-5">
@@ -172,9 +188,16 @@ export function BatchToolPage() {
                 onBatchResultChange={setBatchResult}
               />
               {batchResult && (
-                <p className="mt-4 font-mono text-[11px] uppercase tracking-[0.1em] text-[#757575]">
-                  Last result: {batchResult.successCount} success / {batchResult.failedCount} failed
-                </p>
+                <div
+                  className={`mt-4 border-2 p-3 font-mono text-[12px] font-bold tracking-[0.1em] uppercase ${
+                    batchResult.failedCount > 0
+                      ? "border-black bg-white text-black"
+                      : "border-black bg-black text-white"
+                  }`}
+                >
+                  Last result: {batchResult.successCount} success /{" "}
+                  {batchResult.failedCount} failed
+                </div>
               )}
             </div>
           </div>
@@ -196,7 +219,7 @@ export function ExportToolPage() {
     <ToolPageFrame station="Export">
       <EditorialSection
         eyebrow="Export options"
-        title="APKG, CSV, TSV, original backup."
+        title="Download your files."
         doc={docFor("/export", "deck-export")}
       >
         <ExportWorkbench />
@@ -216,7 +239,7 @@ function ToolPageFrame({
     <div className="px-4 py-6 sm:px-6">
       <div className="mx-auto max-w-[1500px]">
         <div className="mb-2 flex items-center justify-between">
-          <h1 className="text-[34px] font-black leading-none tracking-[-0.03em] sm:text-[46px]">
+          <h1 className="text-[34px] leading-none font-black tracking-[-0.03em] sm:text-[46px]">
             {station}
           </h1>
         </div>
@@ -239,10 +262,10 @@ function EmptyState({
 }) {
   return (
     <div className="border-2 border-black p-8">
-      <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[#757575]">
+      <p className="font-mono text-[11px] font-bold tracking-[0.12em] text-[#757575] uppercase">
         Waiting
       </p>
-      <h3 className="mt-2 text-[28px] font-black leading-none">{title}</h3>
+      <h3 className="mt-2 text-[28px] leading-none font-black">{title}</h3>
       <p className="mt-3 max-w-xl text-[15px] leading-[1.5]">{body}</p>
       {actionLabel && actionHref && (
         <Link

@@ -4,10 +4,7 @@ import { useEffect, useId, useRef } from "react"
 import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
-import {
-  createBrowserStore,
-  useBrowserStore,
-} from "@/lib/browser-store"
+import { createBrowserStore, useBrowserStore } from "@/lib/browser-store"
 
 const ONBOARDING_KEY = "totoneru_onboarding_dismissed"
 
@@ -36,11 +33,11 @@ export function OnboardingOverlay() {
     const previouslyFocused = document.activeElement as HTMLElement | null
 
     const focusableSelectors = [
-      'button:not([disabled])',
-      'a[href]',
-      'input:not([disabled])',
-      'select:not([disabled])',
-      'textarea:not([disabled])',
+      "button:not([disabled])",
+      "a[href]",
+      "input:not([disabled])",
+      "select:not([disabled])",
+      "textarea:not([disabled])",
       '[tabindex]:not([tabindex="-1"])',
     ].join(", ")
 
@@ -106,35 +103,39 @@ export function OnboardingOverlay() {
         aria-labelledby={titleId}
         className="w-full max-w-lg rounded-[20px] border border-border bg-[#FAF7F2] p-8 shadow-[0_24px_48px_rgba(26,26,26,0.16)]"
       >
-        <p className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        <p className="mb-2 font-mono text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
           Welcome
         </p>
         <h2
           id={titleId}
-          className="text-balance text-[28px] font-semibold leading-[1.1] tracking-[-0.02em] text-[#1A1A1A]"
+          className="text-[28px] leading-[1.1] font-semibold tracking-[-0.02em] text-balance text-[#1A1A1A]"
         >
           Transform your Anki deck in the browser
         </h2>
 
         <div className="mt-6 space-y-3">
           <Step number={1} title="Import your .apkg">
-            Drag and drop or pick your Anki deck. It is parsed entirely in your browser — nothing is uploaded.
+            Drag and drop or pick your Anki deck. It is parsed entirely in your
+            browser — nothing is uploaded.
           </Step>
           <Step number={2} title="Map fields & pick a template">
-            totoneru guesses what each field means. You can edit the mappings and choose a Vocabulary or Sentence template.
+            totoneru guesses what each field means. You can edit the mappings
+            and choose a Vocabulary or Sentence template.
           </Step>
           <Step number={3} title="Preview & transform">
-            Toggle built-in transformations (furigana, HTML clean, normalizer) or run AI prompts with your own API key.
+            Toggle built-in transformations (furigana, HTML clean, normalizer)
+            or run AI prompts with your own API key.
           </Step>
           <Step number={4} title="Dry-run, then export">
-            Review changes on 5 sample cards first. Confirm, then export a clean .apkg back to Anki.
+            Review changes on 5 sample cards first. Confirm, then export a clean
+            .apkg back to Anki.
           </Step>
         </div>
 
         <div className="mt-8 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
           <Link
-            href="/how-it-works"
-            className="text-center text-[14px] text-muted-foreground hover:text-foreground transition-colors sm:mr-auto"
+            href="/?intro=1#how-it-works"
+            className="text-center text-[14px] text-muted-foreground transition-colors hover:text-foreground sm:mr-auto"
             onClick={dismiss}
           >
             Learn more
@@ -171,7 +172,9 @@ function Step({
       </span>
       <div>
         <p className="text-[14px] font-medium text-foreground">{title}</p>
-        <p className="text-[13px] text-muted-foreground leading-[1.5]">{children}</p>
+        <p className="text-[13px] leading-[1.5] text-muted-foreground">
+          {children}
+        </p>
       </div>
     </div>
   )

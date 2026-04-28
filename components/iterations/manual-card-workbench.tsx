@@ -30,7 +30,8 @@ export function ManualCardWorkbench() {
   const [words, setWords] = useState<ManualWord[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [isAdding, setIsAdding] = useState(false)
-  const selected = words.find((word) => word.id === selectedId) ?? words[0] ?? null
+  const selected =
+    words.find((word) => word.id === selectedId) ?? words[0] ?? null
 
   useEffect(() => {
     listManualWords().then((loaded) => {
@@ -63,16 +64,26 @@ export function ManualCardWorkbench() {
 
   async function handleUpdate(word: ManualWord) {
     await saveManualWord(word)
-    setWords((current) => current.map((item) => (item.id === word.id ? word : item)))
+    setWords((current) =>
+      current.map((item) => (item.id === word.id ? word : item))
+    )
   }
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
       <div className="border-2 border-black bg-white p-5 text-black">
+        <div className="mb-5 border-b-2 border-black pb-4">
+          <p className="font-mono text-[11px] font-bold tracking-[0.12em] text-[#757575] uppercase">
+            Manual cards
+          </p>
+          <p className="mt-1 font-mono text-[28px] font-black">
+            {words.length}
+          </p>
+        </div>
         <form onSubmit={handleAdd} className="space-y-3">
           <label
             htmlFor={expressionId}
-            className="font-mono text-[11px] font-bold uppercase tracking-[0.12em]"
+            className="font-mono text-[11px] font-bold tracking-[0.12em] uppercase"
           >
             New expression
           </label>
@@ -110,8 +121,10 @@ export function ManualCardWorkbench() {
                   selected?.id === word.id ? "text-[#057dbc]" : "text-black"
                 }`}
               >
-                <span className="truncate text-[18px] font-black">{word.expression}</span>
-                <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[#757575]">
+                <span className="truncate text-[18px] font-black">
+                  {word.expression}
+                </span>
+                <span className="font-mono text-[10px] tracking-[0.1em] text-[#757575] uppercase">
                   {word.targets.join("+")}
                 </span>
               </button>
@@ -129,10 +142,12 @@ export function ManualCardWorkbench() {
         />
       ) : (
         <div className="border-2 border-black p-8">
-          <p className="font-mono text-[12px] uppercase tracking-[0.12em] text-[#757575]">
+          <p className="font-mono text-[12px] tracking-[0.12em] text-[#757575] uppercase">
             Select a card
           </p>
-          <p className="mt-2 text-[24px] font-black">Add an expression above to start editing.</p>
+          <p className="mt-2 text-[24px] font-black">
+            Add an expression above to start editing.
+          </p>
         </div>
       )}
     </div>
@@ -211,7 +226,10 @@ function ManualCardEditor({
     }
   }
 
-  function updateField(field: keyof ManualWord["generatedFields"], value: string) {
+  function updateField(
+    field: keyof ManualWord["generatedFields"],
+    value: string
+  ) {
     setDraft((current) => ({
       ...current,
       generatedFields: {
@@ -229,10 +247,10 @@ function ManualCardEditor({
     <div className="border-2 border-black bg-white p-5 text-black">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b-2 border-black pb-4">
         <div>
-          <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[#757575]">
+          <p className="font-mono text-[11px] font-bold tracking-[0.12em] text-[#757575] uppercase">
             Manual card
           </p>
-          <h3 className="text-[32px] font-black leading-none tracking-[-0.02em]">
+          <h3 className="text-[32px] leading-none font-black tracking-[-0.02em]">
             {draft.expression}
           </h3>
         </div>
@@ -249,8 +267,11 @@ function ManualCardEditor({
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {fieldLabels.map(([field, label]) => (
-          <label key={field} className={field === "notes" ? "sm:col-span-2" : undefined}>
-            <span className="font-mono text-[11px] font-bold uppercase tracking-[0.12em]">
+          <label
+            key={field}
+            className={field === "notes" ? "sm:col-span-2" : undefined}
+          >
+            <span className="font-mono text-[11px] font-bold tracking-[0.12em] uppercase">
               {label}
             </span>
             <textarea
@@ -297,7 +318,7 @@ function ManualCardEditor({
           AI fill
         </Button>
         {message && (
-          <span className="font-mono text-[12px] uppercase tracking-[0.08em] text-[#757575]">
+          <span className="font-mono text-[12px] tracking-[0.08em] text-[#757575] uppercase">
             {message}
           </span>
         )}
@@ -316,7 +337,7 @@ function TargetCheckbox({
   onChange: (checked: boolean) => void
 }) {
   return (
-    <label className="flex cursor-pointer items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.1em]">
+    <label className="flex cursor-pointer items-center gap-2 font-mono text-[11px] font-bold tracking-[0.1em] uppercase">
       <input
         type="checkbox"
         checked={checked}
@@ -329,13 +350,18 @@ function TargetCheckbox({
 }
 
 function parseAiJson(raw: string): Partial<ManualWord["generatedFields"]> {
-  const trimmed = raw.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "")
+  const trimmed = raw
+    .trim()
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/```$/i, "")
   const parsed = JSON.parse(trimmed) as Record<string, unknown>
   return {
     reading: typeof parsed.reading === "string" ? parsed.reading : undefined,
     meaning: typeof parsed.meaning === "string" ? parsed.meaning : undefined,
     sentence: typeof parsed.sentence === "string" ? parsed.sentence : undefined,
-    translation: typeof parsed.translation === "string" ? parsed.translation : undefined,
+    translation:
+      typeof parsed.translation === "string" ? parsed.translation : undefined,
     notes: typeof parsed.notes === "string" ? parsed.notes : undefined,
   }
 }

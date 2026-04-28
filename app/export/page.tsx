@@ -2,7 +2,7 @@ import { IterationShell } from "@/components/iterations/iteration-shell"
 import { ExportToolPage } from "@/components/iterations/tool-pages"
 
 export const metadata = {
-  title: "Export Options — totoneru",
+  title: "Export - totoneru",
 }
 
 export default function ExportPage() {

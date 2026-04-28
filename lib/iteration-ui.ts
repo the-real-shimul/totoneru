@@ -19,7 +19,13 @@ export type SiteTone = {
   footerNote: string
 }
 
-export type IterationPageKey = "home" | "import" | "add" | "ai" | "batch" | "export"
+export type IterationPageKey =
+  | "home"
+  | "import"
+  | "add"
+  | "ai"
+  | "batch"
+  | "export"
 
 export type IterationNavItem = {
   key: IterationPageKey
@@ -29,20 +35,24 @@ export type IterationNavItem = {
 }
 
 export const SITE_TONE: SiteTone = {
-  name: "Kinetic lab",
-  eyebrow: "Kinetic lab",
-  headline: "A tiny newspaper machine for unruly flashcards.",
-  deck:
-    "For Japanese learners who obsess over cards. Manually build, AI-transform, or import decks of Anki flashcards entirely in your browser.",
+  name: "totoneru",
+  eyebrow: "Client-side Anki tools",
+  headline: "Clean, expand, and export Anki decks in your browser.",
+  deck: "For Japanese learners who want safer deck cleanup, manual card creation, and optional AI transforms without server-side deck storage.",
   footerNote:
-    "totoneru is playful, but the data rules stay boring: no server deck storage, no surprise writes.",
+    "Open source, client-side only, and built around dry-runs before bulk changes.",
 }
 
 export function getIterationNav(base = ""): IterationNavItem[] {
   return [
-    { key: "home", label: "Front Page", href: base || "/", icon: LibraryBig },
+    { key: "home", label: "Home", href: base || "/", icon: LibraryBig },
     { key: "import", label: "Import", href: `${base}/import`, icon: Upload },
-    { key: "add", label: "Add Cards", href: `${base}/add-cards`, icon: FilePlus2 },
+    {
+      key: "add",
+      label: "Add Cards",
+      href: `${base}/add-cards`,
+      icon: FilePlus2,
+    },
     { key: "ai", label: "AI", href: `${base}/ai`, icon: Bot },
     { key: "batch", label: "Batch", href: `${base}/batch`, icon: Boxes },
     { key: "export", label: "Export", href: `${base}/export`, icon: Download },
@@ -52,26 +62,26 @@ export function getIterationNav(base = ""): IterationNavItem[] {
 export const workflowSteps = [
   {
     title: "Import",
-    kicker: "LOCAL READ",
+    kicker: "Deck import",
     body: "Drop a modern .apkg. The original is backed up before parsing starts.",
     icon: FileArchive,
   },
   {
-    title: "Map + Add",
-    kicker: "NEW CARDS",
-    body: "Create cards directly, then target standalone export, deck merge, or both.",
+    title: "Add Cards",
+    kicker: "Manual cards",
+    body: "Create cards directly, then export them alone or include them with an imported deck.",
     icon: FilePlus2,
   },
   {
     title: "Transform",
-    kicker: "AI OPTIONAL",
+    kicker: "Optional AI",
     body: "Clean fields, generate furigana, or run BYO-key prompts against mapped fields.",
     icon: Sparkles,
   },
   {
-    title: "Batch + Export",
-    kicker: "DRY RUN FIRST",
-    body: "Review staged changes, then export APKG, CSV, or TSV without mutating the backup.",
+    title: "Batch",
+    kicker: "Dry-run first",
+    body: "Preview staged changes before applying them across the deck.",
     icon: ScanLine,
   },
 ]
@@ -79,7 +89,8 @@ export const workflowSteps = [
 export const exportFormats = [
   {
     label: "Transformed APKG",
-    detail: "Modern collection.anki21b package copied from the original backup.",
+    detail:
+      "Modern collection.anki21b package copied from the original backup.",
   },
   {
     label: "Standalone APKG",
